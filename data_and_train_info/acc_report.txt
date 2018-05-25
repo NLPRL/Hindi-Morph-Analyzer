@@ -23,8 +23,12 @@ NOTE: I have mentioned the labels for each of these categories in the file data_
 Total test instances = 38,948
 Simple BLSTM model with a context of 1 word back and forth predicts the root as well as the six features for all 38,948 instances in 105s, i.e. an average of 370.93 instances per second!
 blstm + context1 + attention took 108s for same.
-
+blstm + context2 = 147s (tam = 0.81)
+blstm + context2 + att = 145s (tam = 0.72)
+" " + context3 + att = 177s (tam = 0.79)
+" " + cont3 = 10 epoch
 
 ##### No of training epochs for convergence #######
 context1, simple BLSTM = 21 epochs
 context1, with attention (Bahdanau) = 26
+context2 = 12
