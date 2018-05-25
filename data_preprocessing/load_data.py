@@ -54,13 +54,13 @@ def getIndexedWords(X_unique, y_unique, orig=False):
 		return X
 
 
-def load_data_for_seq2seq(sentences, rootwords, features=None, labels=None, test=False, context1=False, context2=False):
-	print(sentences[:2])
+def load_data_for_seq2seq(sentences, rootwords, features=None, labels=None, test=False, context1=False, context2=False, context3=False):
+	#print(sentences[:2])
 	
 	X_unique = [item for sublist in sentences for item in sublist]
 	y_unique = [item for sublist in rootwords for item in sublist]
 
-	print("X_unique:",X_unique[:5])
+	#print("X_unique:",X_unique[:5])
 	############## processing of test set ################
 	if features != None:
  		j = 0
@@ -78,7 +78,7 @@ def load_data_for_seq2seq(sentences, rootwords, features=None, labels=None, test
  		#print(X_unique[5])
  		copy = X_unique
  		#print(format(Counter(y1)))
- 		print(X_unique[5])
+ 		#print(X_unique[5])
 
  		cnt = len(X_unique)
  		i = 0
@@ -95,6 +95,7 @@ def load_data_for_seq2seq(sentences, rootwords, features=None, labels=None, test
  			i = i + 1
 	 		#except IndexError:
 	 		#break
+	 	'''
 	 	print(X_unique[5])
 	 	print(format(Counter(y1)))
 	 	print(format(Counter(y2)))
@@ -103,6 +104,7 @@ def load_data_for_seq2seq(sentences, rootwords, features=None, labels=None, test
 	 	print(format(Counter(y5)))
 	 	print(format(Counter(y7)))
 	 	print(format(Counter(y8)))
+	 	'''
 	#####################################################
 
 	# process vocab indexing for X in the function since we will need to call it multiple times
@@ -122,31 +124,72 @@ def load_data_for_seq2seq(sentences, rootwords, features=None, labels=None, test
 	
 	# consider a context of 1 word right and left each
 	# make two lists by shifting the elements
-	if context1 == True: 
+	if context1 == True or context2 == True or context3 == True: 
 		X_left = deque(X_unique)
 		print(len(X_left))
 		
-		X_left.append('$') # all elements would be shifted one left
+		X_left.append(' ') # all elements would be shifted one left
 		X_left.popleft()
-		X_left = list(X_left)
-		X_left = getIndexedWords(X_left, y_unique, orig=False)
+		X_left1 = list(X_left)
+		X_left1 = getIndexedWords(X_left1, y_unique, orig=False)
 
-		print(len(X_left))
+		X_left.append(' ')
+		X_left.popleft()
+		X_left2 = list(X_left)
+		X_left2 = getIndexedWords(X_left2, y_unique, orig=False)
 		
+		X_left.append(' ')
+		X_left.popleft()
+		X_left3 = list(X_left)
+		X_left3 = getIndexedWords(X_left3, y_unique, orig=False)
+		
+
 		X_right = deque(X_unique)
-		X_right.appendleft('$') 
+
+		X_right.appendleft(' ') 
 		X_right.pop()
-		X_right = list(X_right)
-		X_right = getIndexedWords(X_right, y_unique, orig=False)
+		X_right1 = list(X_right)
+		X_right1 = getIndexedWords(X_right1, y_unique, orig=False)
 
-		print(len(X_left))
-		print(len(X_right))
+		X_right.appendleft(' ')
+		X_right.pop()
+		X_right2 = list(X_right)
+		X_right2 = getIndexedWords(X_right2, y_unique, orig=False)
 
-		if test == True:
-			complete_list = [X_un, y_un, y1, y2, y3, y4, y5, y7, y8]
-			return (complete_list, X, len(X_vocab)+2, X_word2idx, X_idx2word, y, len(X_vocab)+2, X_word2idx, X_idx2word, X_left, X_right)
-		else:
-			return (X, len(X_vocab)+2, X_word2idx, X_idx2word, y, len(X_vocab)+2, X_word2idx, X_idx2word, X_left, X_right)
+		X_right.appendleft(' ')
+		X_right.pop()
+		X_right3 = list(X_right)
+		X_right3 = getIndexedWords(X_right3, y_unique, orig=False)
+
+		print(len(X_left1))
+		print(len(X_left2))
+		print(len(X_right1))
+		print(len(X_right2))
+
+		if context1 == True:
+			if test == True:
+				complete_list = [X_un, y_un, y1, y2, y3, y4, y5, y7, y8]
+				return (complete_list, X, len(X_vocab)+2, X_word2idx, X_idx2word, y, len(X_vocab)+2, X_word2idx, X_idx2word, X_left, X_right)
+			else:
+				return (X, len(X_vocab)+2, X_word2idx, X_idx2word, y, len(X_vocab)+2, X_word2idx, X_idx2word, X_left, X_right)
+
+		elif context2 == True:
+			if test == True:
+				complete_list = [X_un, y_un, y1, y2, y3, y4, y5, y7, y8]
+				return (complete_list, X, len(X_vocab)+2, X_word2idx, X_idx2word, y, 
+					len(X_vocab)+2, X_word2idx, X_idx2word, X_left1, X_left2, X_right1, X_right2)
+			else:
+				return (X, len(X_vocab)+2, X_word2idx, X_idx2word, y, len(X_vocab)+2, 
+					X_word2idx, X_idx2word, X_left1, X_left2, X_right1, X_right2)
+
+		elif context3 == True:
+			if test == True:
+				complete_list = [X_un, y_un, y1, y2, y3, y4, y5, y7, y8]
+				return (complete_list, X, len(X_vocab)+2, X_word2idx, X_idx2word, y, 
+					len(X_vocab)+2, X_word2idx, X_idx2word, X_left1, X_left2, X_left3, X_right1, X_right2, X_right3)
+			else:
+				return (X, len(X_vocab)+2, X_word2idx, X_idx2word, y, len(X_vocab)+2, 
+					X_word2idx, X_idx2word, X_left1, X_left2, X_left3, X_right1, X_right2, X_right3) 
 	else:
 		if test == True:
 			complete_list = [X_un, y_un, y1, y2, y3, y4, y5, y7, y8]
@@ -271,10 +314,12 @@ features = pickle.load(open('./pickle-dumps/features_intra', 'rb'))
 
 #load_data_for_features_sentencewise(features)
 
-'''
+
 # we keep X_idx2word and y_idx2word the same
-X, X_vocab_len, X_word_to_ix, X_ix_to_word, y, y_vocab_len, y_word_to_ix, y_ix_to_word, X_left, X_right = load_data_for_seq2seq(sentences, rootwords, context1=True)
+#X, X_vocab_len, X_word_to_ix, X_ix_to_word, y, y_vocab_len, y_word_to_ix, y_ix_to_word, X_left, X_right =
+load_data_for_seq2seq(sentences, rootwords, context2=True)
 #load_data_for_features_sentencewise(features)
+'''
 print(X[:5])
 print(X_left[:5])
 print(X_right[:5])
