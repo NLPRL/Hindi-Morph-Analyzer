@@ -5,8 +5,8 @@ import keras.backend as K
 from keras.utils import np_utils
 from keras.preprocessing.sequence import pad_sequences
 from keras.models import Sequential, Model
-from keras.layers import dot, Activation, TimeDistributed, Dense, RepeatVector, Embedding, Input, merge, \
-	concatenate, GaussianNoise
+from keras.layers import Multiply, Add, Lambda, Activation, TimeDistributed, Dense, RepeatVector, Embedding, Input, merge, \
+	concatenate, GaussianNoise, dot 
 from keras.layers.recurrent import LSTM, GRU
 from keras.layers.wrappers import Bidirectional
 from keras.layers.core import Layer
@@ -29,7 +29,7 @@ from predict_with_features import plot_model_performance, returnTrainTestSets
 
 # from curve_plotter import plot_precision_recall
 
-MODE = 'trai'
+MODE = 'train'
 output_mode = 'write'
 
 EPOCHS = 500
@@ -57,7 +57,7 @@ def write_words_to_file(orig_words, predictions):
 	X = [item for sublist in sentences for item in sublist]
 	Y = [item for sublist in orig_words for item in sublist]
 
-	filename = "./outputs/CNNRNN_globalPool_with_noise/multitask_context_out.txt"
+	filename = "./outputs/CNNRNN_luong_attention/multitask_context_out.txt"
 	with open(filename, 'w', encoding='utf-8') as f:
 		f.write("Words" + '\t\t\t' + 'Original Roots' + '\t\t' + "Predicted roots" + '\n')
 		for a, b, c in zip(X, Y, predictions):
@@ -82,7 +82,7 @@ def write_features_to_file(orig_features, pred_features, encoders):
 	words = [item for sublist in sentences for item in sublist]
 
 	for i in range(len(orig_features)):
-		filename = "./outputs/CNNRNN_globalPool_with_noise/feature"+str(i)+"context_out.txt"
+		filename = "./outputs/CNNRNN_luong_attention/feature"+str(i)+"context_out.txt"
 		with open(filename, 'w', encoding='utf-8') as f:
 			f.write("Word" + '\t\t' + 'Original feature' + '\t' + 'Predicted feature' + '\n')
 			for a,b,c in zip(words, orig_features[i], pred_features[i]):
@@ -188,12 +188,25 @@ def process_data(word_sentences, max_len, word_to_ix):
 			sequences[i, j, word] = 1
 	return sequences
 
+# def highway_layers(value, n_layers, activation='tanh', gate_bias=-3):
+# 	dim = K.int_shape(value)[-1]
+# 	gate_bias_initializer = keras.initializers.Constant(gate_bias)
+
+# 	for i in range(n_layers):
+# 		gate = Dense(dim, bias_initializer=gate_bias_initializer)(value)
+# 		gate = Activation('sigmoid')(gate)
+# 		negated_gate = Lambda(lambda x: 1.0-x, output_shape=(dim,))(gate)
+
+# 		transformed = Dense(dim)(value)
+# 		transformed = 
 def create_model(X_vocab_len, X_max_len, y_vocab_len, y_max_len, n_phonetic_features, y1, n1, y2, n2, y3, n3, y4, n4, y5, n5, y6, n6,
 				 hidden_size, num_layers):
 	def smart_merge(vectors, **kwargs):
 		return vectors[0] if len(vectors) == 1 else merge(vectors, **kwargs)
 
-	current_word = Input(shape=(X_max_len,), dtype='float32')
+	current_word = Input(shape=(X_max_len,), dtype='float32') # for encoder (shared)
+	root_word = Input(shape=(X_max_len,), dtype='float32')
+	decoder_input = Input(shape=(X_max_len,), dtype='float32') # for decoder -- attention
 	right_word1 = Input(shape=(X_max_len,), dtype='float32')
 	right_word2 = Input(shape=(X_max_len,), dtype='float32')
 	right_word3 = Input(shape=(X_max_len,), dtype='float32')
@@ -208,18 +221,20 @@ def create_model(X_vocab_len, X_max_len, y_vocab_len, y_max_len, n_phonetic_feat
 						  input_length=X_max_len,
 						  mask_zero=False, name='Embedding')
 
-	list_of_inputs = [current_word, right_word1, right_word2, right_word3,right_word4, 
+	list_of_inputs = [current_word, root_word, right_word1, right_word2, right_word3,right_word4, 
 					left_word1, left_word2, left_word3, left_word4]
 
-	current_word_embedding, right_word_embedding1, right_word_embedding2,right_word_embedding3, right_word_embedding4, \
+	current_word_embedding, root_word_embedding, right_word_embedding1, right_word_embedding2,right_word_embedding3, right_word_embedding4, \
 		left_word_embedding1, left_word_embedding2, left_word_embedding3, left_word_embedding4 = [emb_layer1(i) for i in list_of_inputs]
 
 	print("Typeeeee:: ",type(current_word_embedding))
-	list_of_embeddings = [current_word_embedding, right_word_embedding1, right_word_embedding2,right_word_embedding3, right_word_embedding4, \
+	current_word_embedding = smart_merge([current_word_embedding, root_word_embedding]) # concatenate root word with current input
+	list_of_embeddings1 = [current_word_embedding, right_word_embedding1, right_word_embedding2,right_word_embedding3, right_word_embedding4, \
 		left_word_embedding1, left_word_embedding2, left_word_embedding3, left_word_embedding4]
 
-	list_of_embeddings = [Dropout(0.50)(i) for i in list_of_embeddings]
-	list_of_embeddings = [GaussianNoise(0.01)(i) for i in list_of_embeddings]
+	# list_of_embeddings = [smart_merge([i,root_word_embedding]) for i in list_of_embeddings] # concatenate root word with each of inputs
+	list_of_embeddings = [Dropout(0.50)(i) for i in list_of_embeddings1]
+	list_of_embeddings = [GaussianNoise(0.05)(i) for i in list_of_embeddings]
 	
 	conv4_curr, conv4_right1, conv4_right2, conv4_right3, conv4_right4, conv4_left1, conv4_left2, conv4_left3, conv4_left4 =\
 			[Conv1D(filters=no_filters, 
@@ -228,9 +243,12 @@ def create_model(X_vocab_len, X_max_len, y_vocab_len, y_max_len, n_phonetic_feat
 
 	conv4s = [conv4_curr, conv4_right1, conv4_right2, conv4_right3, conv4_right4, conv4_left1, conv4_left2, conv4_left3, conv4_left4]
 	
-	maxPool4_curr, maxPool4_right1, maxPool4_right2, maxPool4_right3, maxPool4_right4,\
-		maxPool4_left1, maxPool4_left2, maxPool4_left3, maxPool4_left4 = \
-			[AveragePooling1D()(i) for i in conv4s]
+	maxPool4 = [MaxPooling1D()(i) for i in conv4s]
+
+	avgPool4 = [AveragePooling1D()(i) for i in conv4s]
+
+	pool4_curr, pool4_right1, pool4_right2, pool4_right3, pool4_right4, pool4_left1, pool4_left2, pool4_left3, pool4_left4 = \
+		[smart_merge([i,j,k]) for i,j,k in zip(maxPool4, avgPool4, list_of_embeddings1)]
 
 	conv5_curr, conv5_right1, conv5_right2, conv5_right3, conv5_right4, conv5_left1, conv5_left2, conv5_left3, conv5_left4 = \
 			[Conv1D(filters=no_filters,
@@ -240,22 +258,26 @@ def create_model(X_vocab_len, X_max_len, y_vocab_len, y_max_len, n_phonetic_feat
 				strides=1)(i) for i in list_of_embeddings]	
 
 	conv5s = [conv5_curr, conv5_right1, conv5_right2, conv5_right3, conv5_right4, conv5_left1, conv5_left2, conv5_left3, conv5_left4]
-	maxPool5_curr, maxPool5_right1, maxPool5_right2, maxPool5_right3, maxPool5_right4,\
-		maxPool5_left1, maxPool5_left2, maxPool5_left3, maxPool5_left4 = \
-			[AveragePooling1D()(i) for i in conv5s]
+	maxPool5 = [AveragePooling1D()(i) for i in conv5s]
+	avgPool5 = [AveragePooling1D()(i) for i in conv5s]
 
-	maxPools = [maxPool4_curr, maxPool4_right1, maxPool4_right2, maxPool4_right3, maxPool4_right4,\
-		maxPool4_left1, maxPool4_left2, maxPool4_left3, maxPool4_left4,\
-		maxPool5_curr, maxPool5_right1, maxPool5_right2, maxPool5_right3, maxPool5_right4,\
-		maxPool5_left1, maxPool5_left2, maxPool5_left3, maxPool5_left4]
+	pool5_curr, pool5_right1, pool5_right2, pool5_right3, pool5_right4, pool5_left1, pool5_left2, pool5_left3, pool5_left4 = \
+		[smart_merge([i,j,k]) for i,j,k in zip(maxPool5, avgPool5, list_of_embeddings1)]
+
+
+	maxPools = [pool4_curr, pool4_right1, pool4_right2, pool4_right3, pool4_right4, \
+		pool4_left1, pool4_left2, pool4_left3, pool4_left4, \
+		pool5_curr, pool5_right1, pool5_right2, pool5_right3, pool5_right4, \
+		pool5_left1, pool5_left2, pool5_left3, pool5_left4]
 
 	concat = smart_merge(maxPools, mode='concat')
+	curr_vector_total = smart_merge([pool4_curr, pool5_curr], mode='concat')
 
 	x = Dropout(0.15)(concat)
 
 	x = Bidirectional(RNN(rnn_output_size))(x)
 
-	total_features = [x, phonetic_input]
+	total_features = [x, curr_vector_total, phonetic_input]
 	concat2 = smart_merge(total_features, mode='concat')
 
 	x = Dense(HIDDEN_DIM, activation='relu', kernel_initializer='he_normal',
@@ -263,7 +285,7 @@ def create_model(X_vocab_len, X_max_len, y_vocab_len, y_max_len, n_phonetic_feat
 
 	x = Dropout(0.15, name='drop')(x)
 
-	x = Dense(HIDDEN_DIM, activation='relu', kernel_initializer='he_normal',
+	x = Dense(HIDDEN_DIM, activation='relu', kernel_initializer='he_normal', activation='tanh',
 			  kernel_constraint= maxnorm(3), bias_constraint=maxnorm(3), name='dense2')(x)
 
 	x = Dropout(0.15, name='drop2')(x)
@@ -274,30 +296,32 @@ def create_model(X_vocab_len, X_max_len, y_vocab_len, y_max_len, n_phonetic_feat
 	out4 = Dense(n4, kernel_initializer='he_normal', activation='softmax', name='output4')(x)
 	out5 = Dense(n5, kernel_initializer='he_normal', activation='softmax', name='output5')(x)
 	out6 = Dense(n6, kernel_initializer='he_normal', activation='softmax', name='output6')(x)
-				
+			
+	# Luong et al. 2015 attention model	
 	emb_layer = Embedding(X_vocab_len, EMBEDDING_DIM,
 						  input_length=X_max_len,
 						  mask_zero=True, name='Embedding_for_seq2seq')
 
 	current_word_embedding = emb_layer(current_word)
-	BidireLSTM_curr = Bidirectional(GRU(rnn_output_size, dropout=dropout, return_sequences=False))(current_word_embedding)
-	#att = AttentionWithContext()(BidireLSTM_curr)
-	# print(att.shape)
-	RepLayer = RepeatVector(y_max_len)
-	RepVec = RepLayer(BidireLSTM_curr)
-	Emb_plus_repeat = [current_word_embedding]
-	Emb_plus_repeat.append(RepVec)
-	Emb_plus_repeat = smart_merge(Emb_plus_repeat, mode='concat')
+	current_word_embedding = GaussianNoise(0.03)(current_word_embedding)
 
-	for _ in range(num_layers):
-		LtoR_LSTM = Bidirectional(GRU(rnn_output_size, dropout=dropout, return_sequences=True))
-		temp = LtoR_LSTM(Emb_plus_repeat)
+	encoder, state = GRU(rnn_output_size, return_sequences=True, unroll=True, return_state=True)(current_word_embedding)
+	encoder_last = encoder[:,-1,:]
 
-	# for each time step in the input, we intend to output |y_vocab_len| time steps
-	time_dist_layer = TimeDistributed(Dense(y_vocab_len, name='dense3'))(temp)
-	outputs = Activation('softmax')(time_dist_layer)
+	decoder = emb_layer(decoder_input)
+	decoder = GRU(rnn_output_size, return_sequences=True, unroll=True)(decoder, initial_state=[state])
 
-	all_inputs = [current_word, right_word1, right_word2, right_word3, right_word4, left_word1, left_word2, left_word3,\
+	attention = dot([decoder, encoder], axes=[2,2])
+	attention = Activation('softmax')(attention)
+
+	context = dot([attention, encoder], axes=[2,1])
+	decoder_combined_context = concatenate([context, decoder])
+
+	outputs = TimeDistributed(Dense(64, activation='tanh'))(decoder_combined_context)
+	outputs = TimeDistributed(Dense(X_vocab_len, activation='softmax'))(outputs)
+
+
+	all_inputs = [current_word, decoder_input, right_word1, right_word2, right_word3, right_word4, left_word1, left_word2, left_word3,\
 				  left_word4, phonetic_input]
 	all_outputs = [outputs, out1, out2, out3, out4, out5, out6]
 
@@ -346,22 +370,22 @@ print("Compiling Model ..")
 model = create_model(X_vocab_len, X_max_len, y_vocab_len, X_max_len, n_phonetics,
 					 y1, n1, y2, n2, y3, n3, y4, n4, y5, n5, y7, n7, HIDDEN_DIM, LAYER_NUM)
 
-saved_weights = "./model_weights/multiTask_with_charCRNN_phonetic.hdf5"
+saved_weights = "./model_weights/charCNN_with_attention.hdf5"
 
 
 if MODE == 'train':
 	print("Training model ..")
-	plot_model(model, to_file="character_cnn_with_rnn.png", show_shapes=True)
+	plot_model(model, to_file="CNNRNN_with_both_pooling.png", show_shapes=True)
 	y_sequences = process_data(y, X_max_len, y_word_to_ix)
 
 	print("X len ======== ", len(X))
 	train_val_cutoff = int(.75 * len(X))
-	X_train, X_left1_tr, X_left2_tr, X_left3_tr, X_left4_tr, X_right1_tr, X_right2_tr, X_right3_tr, X_right4_tr = \
+	X_train, X_left1_tr, X_left2_tr, X_left3_tr, X_left4_tr, X_right1_tr, X_right2_tr, X_right3_tr, X_right4_tr, y_train = \
 		[X[:train_val_cutoff], X_left1[:train_val_cutoff], X_left2[:train_val_cutoff], X_left3[:train_val_cutoff], X_left4[:train_val_cutoff],
-			X_right1[:train_val_cutoff], X_right2[:train_val_cutoff], X_right3[:train_val_cutoff], X_right4[:train_val_cutoff]]
-	X_val, X_left1_val, X_left2_val, X_left3_val, X_left4_val, X_right1_val, X_right2_val, X_right3_val, X_right4_val = \
+			X_right1[:train_val_cutoff], X_right2[:train_val_cutoff], X_right3[:train_val_cutoff], X_right4[:train_val_cutoff], y[:train_val_cutoff]]
+	X_val, X_left1_val, X_left2_val, X_left3_val, X_left4_val, X_right1_val, X_right2_val, X_right3_val, X_right4_val, y_val = \
 		[X[train_val_cutoff:], X_left1[train_val_cutoff:], X_left2[train_val_cutoff:], X_left3[train_val_cutoff:], X_left4[train_val_cutoff:],
-			X_right1[train_val_cutoff:], X_right2[train_val_cutoff:], X_right3[train_val_cutoff:], X_right4[train_val_cutoff:]]
+			X_right1[train_val_cutoff:], X_right2[train_val_cutoff:], X_right3[train_val_cutoff:], X_right4[train_val_cutoff:], y[train_val_cutoff:]]
 
 	y_sequences_tr, y1_tr, y2_tr, y3_tr, y4_tr, y5_tr, y7_tr = \
 			[y_sequences[:train_val_cutoff], y1[:train_val_cutoff], y2[:train_val_cutoff], y3[:train_val_cutoff], \
@@ -370,13 +394,21 @@ if MODE == 'train':
 			[y_sequences[train_val_cutoff:], y1[train_val_cutoff:], y2[train_val_cutoff:], y3[train_val_cutoff:], \
 				y4[train_val_cutoff:], y5[train_val_cutoff:], y7[train_val_cutoff:]]
 
-	hist = model.fit([X_train, X_left1_tr, X_left2_tr, X_left3_tr, X_left4_tr, X_right1_tr, X_right2_tr, X_right3_tr, X_right4_tr, X_train_phonetics],
+	X_decoder_input = np.zeros_like(X_train)
+	X_decoder_input[:, 1:] = X_train[:,:-1]
+	X_decoder_input[:, 0] = 1
+
+	X_decoder_val = np.zeros_like(X_val)
+	X_decoder_val[:, 1:] = X_val[:,:-1]
+	X_decoder_val[:, 0] = 1
+
+	hist = model.fit([X_train, y_train, X_decoder_input, X_left1_tr, X_left2_tr, X_left3_tr, X_left4_tr, X_right1_tr, X_right2_tr, X_right3_tr, X_right4_tr, X_train_phonetics],
 					 [y_sequences_tr, y1_tr, y2_tr, y3_tr, y4_tr, y5_tr, y7_tr],
-					 validation_data=([X_val, X_left1_val, X_left2_val, X_left3_val, X_left4_val, X_right1_val, X_right2_val, X_right3_val, X_right4_val, X_val_phonetics],\
+					 validation_data=([X_val, y_val, X_decoder_val, X_left1_val, X_left2_val, X_left3_val, X_left4_val, X_right1_val, X_right2_val, X_right3_val, X_right4_val, X_val_phonetics],\
 					 	[y_sequences_val, y1_val, y2_val, y3_val, y4_val, y5_val, y7_val]),
 					 batch_size=BATCH_SIZE, epochs=EPOCHS,
 					 callbacks=[EarlyStopping(patience=10),
-								ModelCheckpoint('./model_weights/multiTask_with_charCRNN_phonetic.hdf5', save_best_only=True,
+								ModelCheckpoint('./model_weights/charCNN_with_attention.hdf5', save_best_only=True,
 												verbose=1)])
 
 	print(hist.history.keys())
@@ -420,14 +452,18 @@ else:
 																							n,
 																							enc)  # pass previous encoders as args
 
+		decoder_input = np.zeros_like(X_test)
+		decoder_input[:, 1:] = X_test[:,:-1]
+		decoder_input[:, 0] = 1
+
 		model.load_weights(saved_weights)
 		print(model.summary())
-		print(model.evaluate([X_test, X_left1, X_left2, X_left3, X_left4, X_right1, X_right2, X_right3, X_right4, X_phonetic_features],
+		print(model.evaluate([X_test, decoder_input, X_left1, X_left2, X_left3, X_left4, X_right1, X_right2, X_right3, X_right4, X_phonetic_features],
 							 [y_test_seq, y1, y2, y3, y4, y5, y7]))
 		print(model.metrics_names)
 
 		words, f1, f2, f3, f4, f5, f7 = model.predict(
-			[X_test, X_left1, X_left2, X_left3, X_left4, X_right1, X_right2, X_right3, X_right4, X_phonetic_features])
+			[X_test, decoder_input, X_left1, X_left2, X_left3, X_left4, X_right1, X_right2, X_right3, X_right4, X_phonetic_features])
 
 		predictions = np.argmax(words, axis=2)
 
@@ -436,7 +472,7 @@ else:
 
 		if output_mode == 'dump':
 
-			pickle.dump(pred_features, open('./pickle-dumps/predictions_rcnn_with_phonetics', 'wb'))
+			pickle.dump(pred_features, open('./pickle-dumps/predictions_rcnn_with_attention', 'wb'))
 			pickle.dump(orig_features, open('./pickle-dumps/originals', 'wb'))
 			pickle.dump(n, open('./pickle-dumps/num_classes', 'wb'))
 			pickle.dump(class_labels, open('./pickle-dumps/class_labels', 'wb'))

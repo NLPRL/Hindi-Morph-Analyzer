@@ -5,7 +5,7 @@ import keras.backend as K
 from keras.utils import np_utils
 from keras.preprocessing.sequence import pad_sequences
 from keras.models import Sequential, Model
-from keras.layers import dot, Activation, TimeDistributed, Dense, RepeatVector, Embedding, Input, merge, \
+from keras.layers import Multiply, Add, Lambda, Activation, TimeDistributed, Dense, RepeatVector, Embedding, Input, merge, \
 	concatenate, GaussianNoise
 from keras.layers.recurrent import LSTM, GRU
 from keras.layers.wrappers import Bidirectional
@@ -30,7 +30,7 @@ from predict_with_features import plot_model_performance, returnTrainTestSets
 # from curve_plotter import plot_precision_recall
 
 MODE = 'trai'
-output_mode = 'write'
+output_mode = 'dump'
 
 EPOCHS = 500
 dropout = 0.2
@@ -188,6 +188,17 @@ def process_data(word_sentences, max_len, word_to_ix):
 			sequences[i, j, word] = 1
 	return sequences
 
+# def highway_layers(value, n_layers, activation='tanh', gate_bias=-3):
+# 	dim = K.int_shape(value)[-1]
+# 	gate_bias_initializer = keras.initializers.Constant(gate_bias)
+
+# 	for i in range(n_layers):
+# 		gate = Dense(dim, bias_initializer=gate_bias_initializer)(value)
+# 		gate = Activation('sigmoid')(gate)
+# 		negated_gate = Lambda(lambda x: 1.0-x, output_shape=(dim,))(gate)
+
+# 		transformed = Dense(dim)(value)
+# 		transformed = 
 def create_model(X_vocab_len, X_max_len, y_vocab_len, y_max_len, n_phonetic_features, y1, n1, y2, n2, y3, n3, y4, n4, y5, n5, y6, n6,
 				 hidden_size, num_layers):
 	def smart_merge(vectors, **kwargs):
@@ -220,6 +231,7 @@ def create_model(X_vocab_len, X_max_len, y_vocab_len, y_max_len, n_phonetic_feat
 
 	list_of_embeddings = [Dropout(0.50)(i) for i in list_of_embeddings]
 	list_of_embeddings = [GaussianNoise(0.01)(i) for i in list_of_embeddings]
+	# phonetic_input = GaussianNoise(0.01)(phonetic_input)
 	
 	conv4_curr, conv4_right1, conv4_right2, conv4_right3, conv4_right4, conv4_left1, conv4_left2, conv4_left3, conv4_left4 =\
 			[Conv1D(filters=no_filters, 
@@ -228,9 +240,12 @@ def create_model(X_vocab_len, X_max_len, y_vocab_len, y_max_len, n_phonetic_feat
 
 	conv4s = [conv4_curr, conv4_right1, conv4_right2, conv4_right3, conv4_right4, conv4_left1, conv4_left2, conv4_left3, conv4_left4]
 	
-	maxPool4_curr, maxPool4_right1, maxPool4_right2, maxPool4_right3, maxPool4_right4,\
-		maxPool4_left1, maxPool4_left2, maxPool4_left3, maxPool4_left4 = \
-			[AveragePooling1D()(i) for i in conv4s]
+	maxPool4 = [MaxPooling1D()(i) for i in conv4s]
+
+	avgPool4 = [AveragePooling1D()(i) for i in conv4s]
+
+	pool4_curr, pool4_right1, pool4_right2, pool4_right3, pool4_right4, pool4_left1, pool4_left2, pool4_left3, pool4_left4 = \
+		[smart_merge([i,j]) for i,j in zip(maxPool4, avgPool4)]
 
 	conv5_curr, conv5_right1, conv5_right2, conv5_right3, conv5_right4, conv5_left1, conv5_left2, conv5_left3, conv5_left4 = \
 			[Conv1D(filters=no_filters,
@@ -240,18 +255,23 @@ def create_model(X_vocab_len, X_max_len, y_vocab_len, y_max_len, n_phonetic_feat
 				strides=1)(i) for i in list_of_embeddings]	
 
 	conv5s = [conv5_curr, conv5_right1, conv5_right2, conv5_right3, conv5_right4, conv5_left1, conv5_left2, conv5_left3, conv5_left4]
-	maxPool5_curr, maxPool5_right1, maxPool5_right2, maxPool5_right3, maxPool5_right4,\
-		maxPool5_left1, maxPool5_left2, maxPool5_left3, maxPool5_left4 = \
-			[AveragePooling1D()(i) for i in conv5s]
+	maxPool5 = [AveragePooling1D()(i) for i in conv5s]
+	avgPool5 = [AveragePooling1D()(i) for i in conv5s]
 
-	maxPools = [maxPool4_curr, maxPool4_right1, maxPool4_right2, maxPool4_right3, maxPool4_right4,\
-		maxPool4_left1, maxPool4_left2, maxPool4_left3, maxPool4_left4,\
-		maxPool5_curr, maxPool5_right1, maxPool5_right2, maxPool5_right3, maxPool5_right4,\
-		maxPool5_left1, maxPool5_left2, maxPool5_left3, maxPool5_left4]
+	pool5_curr, pool5_right1, pool5_right2, pool5_right3, pool5_right4, pool5_left1, pool5_left2, pool5_left3, pool5_left4 = \
+		[smart_merge([i,j]) for i,j in zip(maxPool5, avgPool5)]
+
+
+	maxPools = [pool4_curr, pool4_right1, pool4_right2, pool4_right3, pool4_right4, \
+		pool4_left1, pool4_left2, pool4_left3, pool4_left4, \
+		pool5_curr, pool5_right1, pool5_right2, pool5_right3, pool5_right4, \
+		pool5_left1, pool5_left2, pool5_left3, pool5_left4]
 
 	concat = smart_merge(maxPools, mode='concat')
 
 	x = Dropout(0.15)(concat)
+
+
 
 	x = Bidirectional(RNN(rnn_output_size))(x)
 
@@ -351,7 +371,7 @@ saved_weights = "./model_weights/multiTask_with_charCRNN_phonetic.hdf5"
 
 if MODE == 'train':
 	print("Training model ..")
-	plot_model(model, to_file="character_cnn_with_rnn.png", show_shapes=True)
+	plot_model(model, to_file="CNNRNN_with_both_pooling.png", show_shapes=True)
 	y_sequences = process_data(y, X_max_len, y_word_to_ix)
 
 	print("X len ======== ", len(X))
