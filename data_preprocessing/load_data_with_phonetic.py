@@ -84,7 +84,7 @@ def getSentenceWiseAdjustedLeft(l1, l2):
 
 	return newlist
 
-def load_data_for_seq2seq(sentences, rootwords, features=None, labels=None, test=False, context1=False, context2=False, context3=False,
+def load_data_for_seq2seq(sentences, rootwords, X_phonetic=None, features=None, labels=None, test=False, context1=False, context2=False, context3=False,
 	context4=False, context5=False):
 	#print(sentences[:2])
 	
@@ -100,7 +100,8 @@ def load_data_for_seq2seq(sentences, rootwords, features=None, labels=None, test
  		y1,y2,y3,y4,y5,y7,y8 = features
  		l1, l2, l3, l4, l5, l7, l8 = labels
 
- 		complete_list = [X_unique, y_unique, y1, y2, y3, y4, y5, y7, y8]
+ 		X_phonetic = X_phonetic.tolist() # numpy arrays don't support deletion
+ 		complete_list = [X_unique, X_phonetic, y_unique, y1, y2, y3, y4, y5, y7, y8]
 
  		copy = X_unique
 
@@ -118,6 +119,7 @@ def load_data_for_seq2seq(sentences, rootwords, features=None, labels=None, test
  				i = i - 1
  			i = i + 1
 
+ 		X_phonetic = np.asarray(X_phonetic)
 	#####################################################
 
 	# process vocab indexing for X in the function since we will need to call it multiple times
@@ -202,7 +204,7 @@ def load_data_for_seq2seq(sentences, rootwords, features=None, labels=None, test
 		if context1 == True:
 			if test == True:
 				complete_list = [X_un, y_un, y1, y2, y3, y4, y5, y7, y8]
-				return (complete_list, X, len(X_vocab)+2, X_word2idx, X_idx2word, y, len(X_vocab)+2, X_word2idx, X_idx2word, X_left, X_right)
+				return (complete_list, X, len(X_vocab)+2, X_word2idx, X_idx2word, y, len(X_vocab)+2, X_word2idx, X_idx2word, X_left, X_right, X_phonetic)
 			else:
 				return (X, len(X_vocab)+2, X_word2idx, X_idx2word, y, len(X_vocab)+2, X_word2idx, X_idx2word, X_left, X_right)
 
@@ -210,7 +212,7 @@ def load_data_for_seq2seq(sentences, rootwords, features=None, labels=None, test
 			if test == True:
 				complete_list = [X_un, y_un, y1, y2, y3, y4, y5, y7, y8]
 				return (complete_list, X, len(X_vocab)+2, X_word2idx, X_idx2word, y, 
-					len(X_vocab)+2, X_word2idx, X_idx2word, X_left1, X_left2, X_right1, X_right2)
+					len(X_vocab)+2, X_word2idx, X_idx2word, X_left1, X_left2, X_right1, X_right2, X_phonetic)
 			else:
 				return (X, len(X_vocab)+2, X_word2idx, X_idx2word, y, len(X_vocab)+2, 
 					X_word2idx, X_idx2word, X_left1, X_left2, X_right1, X_right2)
@@ -219,7 +221,7 @@ def load_data_for_seq2seq(sentences, rootwords, features=None, labels=None, test
 			if test == True:
 				complete_list = [X_un, y_un, y1, y2, y3, y4, y5, y7, y8]
 				return (complete_list, X, len(X_vocab)+2, X_word2idx, X_idx2word, y, 
-					len(X_vocab)+2, X_word2idx, X_idx2word, X_left1, X_left2, X_left3, X_right1, X_right2, X_right3)
+					len(X_vocab)+2, X_word2idx, X_idx2word, X_left1, X_left2, X_left3, X_right1, X_right2, X_right3, X_phonetic)
 			else:
 				return (X, len(X_vocab)+2, X_word2idx, X_idx2word, y, len(X_vocab)+2, 
 					X_word2idx, X_idx2word, X_left1, X_left2, X_left3, X_right1, X_right2, X_right3) 
@@ -228,7 +230,7 @@ def load_data_for_seq2seq(sentences, rootwords, features=None, labels=None, test
 			if test == True:
 				complete_list = [X_un, y_un, y1, y2, y3, y4, y5, y7, y8]
 				return (complete_list, X, len(X_vocab)+2, X_word2idx, X_idx2word, y, 
-					len(X_vocab)+2, X_word2idx, X_idx2word, X_left1, X_left2, X_left3, X_left4, X_right1, X_right2, X_right3, X_right4)
+					len(X_vocab)+2, X_word2idx, X_idx2word, X_left1, X_left2, X_left3, X_left4, X_right1, X_right2, X_right3, X_right4, X_phonetic)
 			else:
 				return (X, len(X_vocab)+2, X_word2idx, X_idx2word, y, len(X_vocab)+2, 
 					X_word2idx, X_idx2word, X_left1, X_left2, X_left3, X_left4, X_right1, X_right2, X_right3, X_right4) 
@@ -238,14 +240,14 @@ def load_data_for_seq2seq(sentences, rootwords, features=None, labels=None, test
 				complete_list = [X_un, y_un, y1, y2, y3, y4, y5, y7, y8]
 				return (complete_list, X, len(X_vocab)+2, X_word2idx, X_idx2word, y, 
 					len(X_vocab)+2, X_word2idx, X_idx2word, X_left1, X_left2, X_left3, X_left4, X_left5, X_right1, \
-					 X_right2, X_right3, X_right4, X_right5)
+					 X_right2, X_right3, X_right4, X_right5, X_phonetic)
 			else:
 				return (X, len(X_vocab)+2, X_word2idx, X_idx2word, y, len(X_vocab)+2, 
 					X_word2idx, X_idx2word, X_left1, X_left2, X_left3, X_left4, X_left5, X_right1, X_right2, X_right3, X_right4, X_right5) 
 	else:
 		if test == True:
 			complete_list = [X_un, y_un, y1, y2, y3, y4, y5, y7, y8]
-			return (complete_list, X, len(X_vocab)+2, X_word2idx, X_idx2word, y, len(X_vocab)+2, X_word2idx, X_idx2word)
+			return (complete_list, X, len(X_vocab)+2, X_word2idx, X_idx2word, y, len(X_vocab)+2, X_word2idx, X_idx2word, X_phonetic)
 		else:
 			return (X, len(X_vocab)+2, X_word2idx, X_idx2word, y, len(X_vocab)+2, X_word2idx, X_idx2word)
 
