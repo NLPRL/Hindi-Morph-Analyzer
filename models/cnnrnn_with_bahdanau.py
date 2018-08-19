@@ -4,7 +4,7 @@ from load_data_with_phonetic import load_data_for_seq2seq, load_data_for_feature
 import keras.backend as K
 from keras.utils import np_utils
 from keras.preprocessing.sequence import pad_sequences
-from keras.models import Sequential, Model, load_model
+from keras.models import Sequential, Model
 from keras.layers import Multiply, Add, Lambda, Activation, TimeDistributed, Dense, RepeatVector, Embedding, Input, merge, \
 	concatenate, GaussianNoise, dot 
 from keras.layers.recurrent import LSTM, GRU
@@ -29,8 +29,8 @@ from predict_with_features import plot_model_performance, returnTrainTestSets
 
 # from curve_plotter import plot_precision_recall
 
-MODE = 'trai'
-output_mode = 'write'
+MODE = 'train'
+output_mode = 'dump'
 
 EPOCHS = 500
 dropout = 0.2
@@ -38,11 +38,11 @@ TIME_STEPS = 20
 EMBEDDING_DIM = 128
 BATCH_SIZE = 128
 LAYER_NUM = 2
-no_filters = 200
+no_filters = 128
 filter_length = 4
 HIDDEN_DIM = no_filters*2
 RNN = GRU
-rnn_output_size = 64
+rnn_output_size = 32
 folds = 10
 
 class_labels = []
@@ -57,7 +57,7 @@ def write_words_to_file(orig_words, predictions):
 	X = [item for sublist in sentences for item in sublist]
 	Y = [item for sublist in orig_words for item in sublist]
 
-	filename = "./outputs/only_attention/multitask_context_out.txt"
+	filename = "./outputs/CNNRNN_luong_attention_with_roots/multitask_context_out.txt"
 	with open(filename, 'w', encoding='utf-8') as f:
 		f.write("Words" + '\t\t\t' + 'Original Roots' + '\t\t' + "Predicted roots" + '\n')
 		for a, b, c in zip(X, Y, predictions):
@@ -82,7 +82,7 @@ def write_features_to_file(orig_features, pred_features, encoders):
 	words = [item for sublist in sentences for item in sublist]
 
 	for i in range(len(orig_features)):
-		filename = "./outputs/only_attention/feature"+str(i)+"context_out.txt"
+		filename = "./outputs/CNNRNN_luong_attention_with_roots/feature"+str(i)+"context_out.txt"
 		with open(filename, 'w', encoding='utf-8') as f:
 			f.write("Word" + '\t\t' + 'Original feature' + '\t' + 'Predicted feature' + '\n')
 			for a,b,c in zip(words, orig_features[i], pred_features[i]):
@@ -204,18 +204,18 @@ def create_model(X_vocab_len, X_max_len, y_vocab_len, y_max_len, n_phonetic_feat
 	def smart_merge(vectors, **kwargs):
 		return vectors[0] if len(vectors) == 1 else merge(vectors, **kwargs)
 
-	current_word = Input(shape=(X_max_len,), dtype='float32', name='input1') # for encoder (shared)
-	root_word = Input(shape=(X_max_len,), dtype='float32', name='input2')
-	decoder_input = Input(shape=(X_max_len,), dtype='float32', name='input3') # for decoder -- attention
-	right_word1 = Input(shape=(X_max_len,), dtype='float32', name='input4')
-	right_word2 = Input(shape=(X_max_len,), dtype='float32', name='input5')
-	right_word3 = Input(shape=(X_max_len,), dtype='float32', name='input6')
-	right_word4 = Input(shape=(X_max_len,), dtype='float32', name='input7')
-	left_word1 = Input(shape=(X_max_len,), dtype='float32', name='input8')
-	left_word2 = Input(shape=(X_max_len,), dtype='float32', name='input9')
-	left_word3 = Input(shape=(X_max_len,), dtype='float32', name='input10')
-	left_word4 = Input(shape=(X_max_len,), dtype='float32', name='input11')
-	phonetic_input = Input(shape=(n_phonetic_features,), dtype='float32', name='input12')
+	current_word = Input(shape=(X_max_len,), dtype='float32') # for encoder (shared)
+	root_word = Input(shape=(X_max_len,), dtype='float32')
+	decoder_input = Input(shape=(X_max_len,), dtype='float32') # for decoder -- attention
+	right_word1 = Input(shape=(X_max_len,), dtype='float32')
+	right_word2 = Input(shape=(X_max_len,), dtype='float32')
+	right_word3 = Input(shape=(X_max_len,), dtype='float32')
+	right_word4 = Input(shape=(X_max_len,), dtype='float32')
+	left_word1 = Input(shape=(X_max_len,), dtype='float32')
+	left_word2 = Input(shape=(X_max_len,), dtype='float32')
+	left_word3 = Input(shape=(X_max_len,), dtype='float32')
+	left_word4 = Input(shape=(X_max_len,), dtype='float32')
+	phonetic_input = Input(shape=(n_phonetic_features,), dtype='float32')
 
 	emb_layer1 = Embedding(X_vocab_len, EMBEDDING_DIM,
 						  input_length=X_max_len,
@@ -233,34 +233,36 @@ def create_model(X_vocab_len, X_max_len, y_vocab_len, y_max_len, n_phonetic_feat
 		left_word_embedding1, left_word_embedding2, left_word_embedding3, left_word_embedding4]
 
 	# list_of_embeddings = [smart_merge([i,root_word_embedding]) for i in list_of_embeddings] # concatenate root word with each of inputs
-	list_of_embeddings = [Dropout(0.50, name='drop1_'+str(j))(i) for i,j in zip(list_of_embeddings1, range(len(list_of_embeddings1)))]
-	list_of_embeddings = [GaussianNoise(0.05, name='noise1_'+str(j))(i) for i,j in zip(list_of_embeddings, range(len(list_of_embeddings)))]
+	list_of_embeddings = [Dropout(0.50)(i) for i in list_of_embeddings1]
+	list_of_embeddings = [GaussianNoise(0.05)(i) for i in list_of_embeddings]
 	
 	conv4_curr, conv4_right1, conv4_right2, conv4_right3, conv4_right4, conv4_left1, conv4_left2, conv4_left3, conv4_left4 =\
 			[Conv1D(filters=no_filters, 
 				kernel_size=4, padding='valid',activation='relu', 
-				strides=1, name='conv4_'+str(j))(i) for i,j in zip(list_of_embeddings, range(len(list_of_embeddings)))]
+				strides=1)(i) for i in list_of_embeddings]
 
 	conv4s = [conv4_curr, conv4_right1, conv4_right2, conv4_right3, conv4_right4, conv4_left1, conv4_left2, conv4_left3, conv4_left4]
-	maxPool4 = [MaxPooling1D(name='max4_'+str(j))(i) for i,j in zip(conv4s, range(len(conv4s)))]
-	avgPool4 = [AveragePooling1D(name='avg4_'+str(j))(i) for i,j in zip(conv4s, range(len(conv4s)))]
+	
+	maxPool4 = [MaxPooling1D()(i) for i in conv4s]
+
+	avgPool4 = [AveragePooling1D()(i) for i in conv4s]
 
 	pool4_curr, pool4_right1, pool4_right2, pool4_right3, pool4_right4, pool4_left1, pool4_left2, pool4_left3, pool4_left4 = \
-		[merge([i,j], name='merge_conv4_'+str(k)) for i,j,k in zip(maxPool4, avgPool4, range(len(maxPool4)))]
+		[smart_merge([i,j]) for i,j in zip(maxPool4, avgPool4)]
 
 	conv5_curr, conv5_right1, conv5_right2, conv5_right3, conv5_right4, conv5_left1, conv5_left2, conv5_left3, conv5_left4 = \
 			[Conv1D(filters=no_filters,
 				kernel_size=5,
 				padding='valid',
 				activation='relu',
-				strides=1, name='conv5_'+str(j))(i) for i,j in zip(list_of_embeddings, range(len(list_of_embeddings)))]	
+				strides=1)(i) for i in list_of_embeddings]	
 
 	conv5s = [conv5_curr, conv5_right1, conv5_right2, conv5_right3, conv5_right4, conv5_left1, conv5_left2, conv5_left3, conv5_left4]
-	maxPool5 = [MaxPooling1D(name='max5_'+str(j))(i) for i,j in zip(conv5s, range(len(conv5s)))]
-	avgPool5 = [AveragePooling1D(name='avg5_'+str(j))(i) for i,j in zip(conv5s, range(len(conv5s)))]
+	maxPool5 = [AveragePooling1D()(i) for i in conv5s]
+	avgPool5 = [AveragePooling1D()(i) for i in conv5s]
 
 	pool5_curr, pool5_right1, pool5_right2, pool5_right3, pool5_right4, pool5_left1, pool5_left2, pool5_left3, pool5_left4 = \
-		[merge([i,j], name='merge_conv5_'+str(k)) for i,j,k in zip(maxPool5, avgPool5, range(len(maxPool5)))]
+		[smart_merge([i,j]) for i,j in zip(maxPool5, avgPool5)]
 
 
 	maxPools = [pool4_curr, pool4_right1, pool4_right2, pool4_right3, pool4_right4, \
@@ -268,23 +270,24 @@ def create_model(X_vocab_len, X_max_len, y_vocab_len, y_max_len, n_phonetic_feat
 		pool5_curr, pool5_right1, pool5_right2, pool5_right3, pool5_right4, \
 		pool5_left1, pool5_left2, pool5_left3, pool5_left4]
 
-	concat = merge(maxPools, mode='concat', name='main_merge')
+	concat = smart_merge(maxPools, mode='concat')
 	# curr_vector_total = smart_merge([pool4_curr, pool5_curr], mode='concat')
 
-	x = Dropout(0.15, name='drop_single1')(concat)
+	x = Dropout(0.15)(concat)
 
-	x = Bidirectional(RNN(rnn_output_size, name='rnn_for_features'))(x)
+	x = Bidirectional(RNN(rnn_output_size))(x)
 
 	total_features = [x, phonetic_input]
-	concat2 = merge(total_features, mode='concat', name='phonetic_merging')
+	concat2 = smart_merge(total_features, mode='concat')
 
 	x = Dense(HIDDEN_DIM, activation='relu', kernel_initializer='he_normal',
 			  kernel_constraint= maxnorm(3), bias_constraint=maxnorm(3), name='dense1')(concat2)
-	x = Dropout(0.15, name='drop_single2')(x)
+	x = Dropout(0.15, name='drop')(x)
 
 	x = Dense(HIDDEN_DIM, kernel_initializer='he_normal', activation='tanh',
 			  kernel_constraint= maxnorm(3), bias_constraint=maxnorm(3), name='dense2')(x)
-	x = Dropout(0.15, name='drop_single3')(x)
+
+	x = Dropout(0.15, name='drop2')(x)
 
 	out1 = Dense(n1, kernel_initializer='he_normal', activation='softmax', name='output1')(x)
 	out2 = Dense(n2, kernel_initializer='he_normal', activation='softmax', name='output2')(x)
@@ -292,42 +295,27 @@ def create_model(X_vocab_len, X_max_len, y_vocab_len, y_max_len, n_phonetic_feat
 	out4 = Dense(n4, kernel_initializer='he_normal', activation='softmax', name='output4')(x)
 	out5 = Dense(n5, kernel_initializer='he_normal', activation='softmax', name='output5')(x)
 	out6 = Dense(n6, kernel_initializer='he_normal', activation='softmax', name='output6')(x)
-
+			
 	# Luong et al. 2015 attention model	
 	emb_layer = Embedding(X_vocab_len, EMBEDDING_DIM,
 						  input_length=X_max_len,
 						  mask_zero=True, name='Embedding_for_seq2seq')
 
-	current_word_embedding, root_word_embedding, right_word_embedding1, right_word_embedding2,right_word_embedding3, right_word_embedding4, \
-		left_word_embedding1, left_word_embedding2, left_word_embedding3, left_word_embedding4 = [emb_layer(i) for i in list_of_inputs]
+	current_word_embedding = emb_layer(current_word)
+	current_word_embedding = GaussianNoise(0.03)(current_word_embedding)
 
-	current_word_embedding = smart_merge([ current_word_embedding, right_word_embedding1, right_word_embedding2,  left_word_embedding1, left_word_embedding2])
+	encoder = Bidirectional(RNN(rnn_output_size, return_sequences=True))(current_word_embedding)
+	outputs = AttentionWithContext()(encoder)
 
-	encoder, state = GRU(64, return_sequences=True, unroll=True, return_state=True, name='encoder')(current_word_embedding)
-	encoder_last = encoder[:,-1,:]
-
-	decoder = emb_layer(decoder_input)
-	decoder = GRU(64, return_sequences=True, unroll=True, name='decoder')(decoder, initial_state=[state])
-
-	attention = dot([decoder, encoder], axes=[2,2], name='dot')
-	attention = Activation('softmax', name='attention')(attention)
-
-	context = dot([attention, encoder], axes=[2,1], name='dot2')
-	decoder_combined_context = concatenate([context, decoder], name='concatenate')
-
-	outputs = TimeDistributed(Dense(64, activation='tanh', name='td1'))(decoder_combined_context)
-	outputs = TimeDistributed(Dense(X_vocab_len, activation='softmax',  name='td2'))(outputs)
-
-
-	all_inputs = [current_word, root_word, decoder_input, right_word1, right_word2, right_word3, right_word4, left_word1, left_word2, left_word3,\
-				  left_word4, phonetic_input]
+	all_inputs = [current_word, root_word, decoder_input, right_word1, right_word2, right_word3, right_word4, left_word1, \
+				left_word2, left_word3, left_word4, phonetic_input]
 	all_outputs = [outputs, out1, out2, out3, out4, out5, out6]
 
 	model = Model(input=all_inputs, output=all_outputs)
 	opt = Adam()
 	model.compile(optimizer=Adadelta(epsilon=1e-06), loss='categorical_crossentropy',
 				  metrics=['accuracy'],
-				  loss_weights=[1., .5, .5, .5, .5, .5, .5])
+				  loss_weights=[1., 1., 1., 1., 1., 1., 1.])
 
 	return model
 
@@ -370,24 +358,7 @@ model = create_model(X_vocab_len, X_max_len, y_vocab_len, X_max_len, n_phonetics
 
 saved_weights = "./model_weights/charCNN_with_attention.hdf5"
 
-def generate(X_test, rest_features, y_max_len):
-	encoder_input = X_test
-	decoder_input = np.zeros(shape=(len(encoder_input), y_max_len))
-	decoder_input[:,0] = 1
 
-	X_left1, X_left2, X_left3, X_left4, X_right1, X_right2, X_right3, X_right4, X_phonetic_features
-	for i in range(1, y_max_len):
-	    output, _, _, _, _, _, _ = model.predict([encoder_input, decoder_input, X_left1, X_left2, X_left3, X_left4, X_right1, X_right2, X_right3, X_right4, X_phonetic_features])
-	    decoder_input[:,i] = output.argmax(axis=2)[:,i]
-	return decoder_input[:,1:]
-
-def decode(decoding, sequence):
-    text = ''
-    for i in sequence:
-        if i == 0:
-            break
-        text += output_decoding[i]
-    return text
 if MODE == 'train':
 	print("Training model ..")
 	plot_model(model, to_file="CNNRNN_with_both_pooling.png", show_shapes=True)
@@ -417,14 +388,15 @@ if MODE == 'train':
 	X_decoder_val[:, 1:] = X_val[:,:-1]
 	X_decoder_val[:, 0] = 1
 
-	hist = model.fit([X_train, y_train, X_decoder_input,  X_right1_tr, X_right2_tr, X_right3_tr, X_right4_tr, X_left1_tr, X_left2_tr, X_left3_tr, X_left4_tr, X_train_phonetics],
+	hist = model.fit([X_train, y_train, X_decoder_input, X_left1_tr, X_left2_tr, X_left3_tr, X_left4_tr, X_right1_tr, X_right2_tr, X_right3_tr, X_right4_tr, X_train_phonetics],
 					 [y_sequences_tr, y1_tr, y2_tr, y3_tr, y4_tr, y5_tr, y7_tr],
-					 validation_data=([X_val, y_val, X_decoder_val,  X_right1_val, X_right2_val, X_right3_val, X_right4_val, X_left1_val, X_left2_val, X_left3_val, X_left4_val, X_val_phonetics],\
+					 validation_data=([X_val, y_val, X_decoder_val, X_left1_val, X_left2_val, X_left3_val, X_left4_val, X_right1_val, X_right2_val, X_right3_val, X_right4_val, X_val_phonetics],\
 					 	[y_sequences_val, y1_val, y2_val, y3_val, y4_val, y5_val, y7_val]),
 					 batch_size=BATCH_SIZE, epochs=EPOCHS,
-					 callbacks=[ModelCheckpoint('./model_weights/charCNN_with_attention.hdf5', 	verbose=1, save_weights_only=True)])
+					 callbacks=[EarlyStopping(patience=10),
+								ModelCheckpoint('./model_weights/charCNN_with_attention.hdf5', save_best_only=True,
+												verbose=1)])
 
-	model.save('./model_weights/attention_with_roots.hdf5')
 	print(hist.history.keys())
 	print(hist)
 	plot_model_performance(
@@ -472,21 +444,12 @@ else:
 
 		model.load_weights(saved_weights)
 		print(model.summary())
-
-		# rest_features = [y_test, X_left1, X_left2, X_left3, X_left4, X_right1, X_right2, X_right3, X_right4, X_phonetic_features]
-
-		# sequences = []
-		# for i in range(len(X_test)):
-		# 	decoder_output = generate(X_test[i], rest_features[:][i])
-		# 	text = decode(y_ix_to_word, decoder_output)
-		# 	sequences.append(text)
-
-		print(model.evaluate([X_test, y_test, decoder_input,  X_right1, X_right2, X_right3, X_right4, X_left1, X_left2, X_left3, X_left4, X_phonetic_features],
+		print(model.evaluate([X_test, y_test, decoder_input, X_left1, X_left2, X_left3, X_left4, X_right1, X_right2, X_right3, X_right4, X_phonetic_features],
 							 [y_test_seq, y1, y2, y3, y4, y5, y7]))
-		# # print(model.metrics_names)
+		# print(model.metrics_names)
 
 		words, f1, f2, f3, f4, f5, f7 = model.predict(
-			[X_test, y_test, decoder_input, X_right1, X_right2, X_right3, X_right4, X_left1, X_left2, X_left3, X_left4, X_phonetic_features])
+			[X_test, y_test, decoder_input, X_left1, X_left2, X_left3, X_left4, X_right1, X_right2, X_right3, X_right4, X_phonetic_features])
 
 		predictions = np.argmax(words, axis=2)
 
@@ -522,3 +485,4 @@ else:
 			sequences.append(sequence)
 
 		write_words_to_file(test_roots, sequences)
+
