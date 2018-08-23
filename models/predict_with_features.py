@@ -156,6 +156,88 @@ def place_of_articulation(word):
 
 	return is_labiodental, is_dental, is_glottal
 
+def get_svar_features(word):
+
+	samvrit = [u'\u0907', u'\u0908', u'\u0909', u'\u090A', u'\u093F', 
+		u'\u0940', u'\u0941', u'\u0942']
+	ardh_samvrit = [u'\u0947', u'\u0946', u'\u094A', u'\u094B', 
+		u'\u090E', u'\u090F', u'\u0913', u'\u0912']
+	ardh_vivrit = [u'\u0955', u'\u0948', u'\u094C', u'\u0949', 
+		u'\u0905', u'\u0910', u'\u090D', u'\u0911', u'\u0914']
+	vivrit = [u'\u0906', u'\u093E']
+	# lower is same as vivrit
+	lower_middle = [u'\u0945', u'\u0949', u'\u0905', u'\u090D', u'\u0911'] 
+	upper_middle = [u'\u0910', u'\u0913', u'\u0912', u'\u090E', 
+		u'\u0946', u'\u0947', u'\u094A', u'\u094B']
+	lower_high = [u'\u0907', u'\u0909', u'\u093F', u'\u0941']
+	high = [u'\u0908', u'\u090A', u'\u0940', u'\u0942']
+
+	total_features = [samvrit, ardh_samvrit, ardh_vivrit, vivrit, 
+		lower_middle, upper_middle, lower_high, high]
+
+	is_samvrit, is_ardhsam, is_ardhviv, is_vivrit, is_lowmid, is_upmid, is_lowhigh, is_high = \
+		[any((char in item) for char in word) for item in total_features]
+
+	return is_samvrit, is_ardhsam, is_ardhviv, is_vivrit, is_lowmid, is_upmid, is_lowhigh, is_high 
+
+def get_sthaan(word):
+	y = [u'\u092A', u'\u092B', u'\u092C', u'\u092D', u'\u092E', u'\u0935']
+	d = [u'\u0924', u'\u0925', u'\u0926', u'\u0927']
+	v = [u'\u0928', u'\u0929', u'\u0930', u'\u0931', u'\u0933', u'\u0934', u'\u0932', u'\u0938']
+	t = [u'\u091A', u'\u091B', u'\u091C', u'\u091D', u'\u091E', u'\u095F', u'\u0936', u'\u0937', u'\u092F']
+	m = [u'\u091F', u'\u0920', u'\u0921', u'\u0922', u'\u0923']
+	k = [u'\u0915', u'\u0916', u'\u0917', u'\u0918', u'\u0919']
+	
+	total_features = [y, d, v, t, m, k]
+	is_dvayostha, is_dantya, is_varstya, is_talavya, is_murdhanya, is_komaltalavya = \
+		[any((char in item) for char in word) for item in total_features]
+
+	return is_dvayostha, is_dantya, is_varstya, is_talavya, is_murdhanya, is_komaltalavya
+
+def get_prayatna(word):
+	nasikya = [u'\u0901', u'\u0902', u'\u0903', u'\u0919', u'\u091E', u'\u0923', u'\u0928', u'\u0929', u'\u092E']
+	sparsha = [u'\u0915', u'\u0916', u'\u0917', u'\u0918', u'\u091A', u'\u091B', u'\u091C', u'\u091D', u'\u091F',\
+		u'\u0920', u'\u0921', u'\u0922', u'\u0924', u'\u0925', u'\u0926', u'\u0927', u'\u092A', u'\u092B', u'\u092C',
+		u'\u092D']
+	parshvika = [u'\u0932', u'\u0933', u'\u0934']
+	prakampi = [u'\u0930', u'\u0931']
+	sangharshi = [u'\u0936',u'\u0937',u'\u0938']
+	ardh_svar = [u'\u095F', u'\u092F', u'\u0935']
+
+	total_features = [nasikya, sparsha, parshvika, prakampi, sangharshi, ardh_svar]
+	is_nasikya, is_sparsha, is_parshvika, is_prakampi, is_sangarshi, is_ardhsvar = \
+		[any((char in item) for char in word) for item in total_features]	
+
+	return is_nasikya, is_sparsha, is_parshvika, is_prakampi, is_sangarshi, is_ardhsvar
+
+def vowel_types(word):
+	front_vowels = [u'\u0907', u'\u0908', u'\u090F', u'\u0910']
+	mid_vowels = [u'\u0905', u'\u0906']
+	back_vowels = [u'\u0909', u'\u090A',u'\u0913', u'\u0914']
+	long_length = [u'\u0906', u'\u0908', u'\u090A', u'\u0910', u'\u0914', u'\u093E', u'\u0940', 
+		u'\u0942', u'\u0948', u'\u094C']
+	short_length = [u'\u0905', u'\u0907', u'\u0909', u'\u090B', u'\u090F', u'\u093F', u'\u0941', 
+		u'\u0913', u'\u094B', u'\u0947', u'\u0943']
+	medium_length = [u'\u090E', u'\u090D', u'\u0912', u'\u0911', u'\u0946', u'\u0945', u'\u094A', u'\u0949']
+
+	total_features = [front_vowels, mid_vowels, back_vowels, long_length, short_length, medium_length]
+
+	is_front, is_mid, is_back, is_long, is_short, is_medium = \
+		[any((char in item) for char in word) for item in total_features]
+
+	return is_front, is_mid, is_back, is_long, is_short, is_medium
+
+def misc_features(word):
+	dravidian = [u'\u090B', u'\u0912', u'\u0931', u'\u0934', u'\u0946', u'\u094A']
+	bangla = [u'\u095F']
+	hard = [u'\u0937',u'\u0933',u'\u0931']
+
+	total_features = [dravidian, bangla, hard]
+
+	is_dravidian, is_bangla, is_hard = [any((char in item) for char in word) for item in total_features]
+
+	return is_dravidian, is_bangla, is_hard
+
 def phonetic_features(word):
 	vowels = [u'\u0905', u'\u0906', u'\u0907', u'\u0908', u'\u0909', 
 		u'\u090A', u'\u090B', u'\u090C', u'\u090D', u'\u090E', u'\u090F', 
@@ -172,10 +254,8 @@ def phonetic_features(word):
 	  	u'\u094C', u'\u094E', u'\u094F']
 	voiced_aspirated = [u'\u092D', u'\u0922', u'\u0927', u'\u091D', u'\u0918', u'\u0923']
 	voiceless_aspirated = [u'\u092B', u'\u0920', u'\u0925', u'\u091B', u'\u0916']
-	modified_consonants = [u'\u0958', u'\u0959'	, u'\u095A'	, u'\u095B'	, u'\u095C'	, u'\u095D', u'\u095E', u'\u095F']
 	modifiers = [u'\u0902', u'\u0901', u'\u0903']
 	diphthongs = [u'\u090D', u'\u090E', u'\u090F', u'\u0910', u'\u0911', u'\u0912', u'\u0913', u'\u0914']
-	
 
 	total_vowels = sum([word.count(i) for i in vowels])
 	nuktas = word.count(nukta)
@@ -189,9 +269,19 @@ def phonetic_features(word):
 	is_modifier = any((char in modifiers) for char in word)
 	is_diphthong = any((char in diphthongs) for char in word)
 	is_labiodental, is_dental, is_glottal = place_of_articulation(word)
+	is_samvrit, is_ardhsam, is_ardhviv, is_vivrit, is_lowmid, is_upmid, is_lowhigh, is_high = \
+		get_svar_features(word)
+	is_dvayostha, is_dantya, is_varstya, is_talavya, is_murdhanya, is_komaltalavya = get_sthaan(word)
+	is_nasikya, is_sparsha, is_parshvika, is_prakampi, is_sangarshi, is_ardhsvar = get_prayatna(word)
+	is_front, is_mid, is_back, is_long, is_short, is_medium = vowel_types(word)
+	is_dravidian, is_bangla, is_hard = misc_features(word)
 
 	return total_vowels, nuktas, total_punctuations, total_numbers, total_consonants, is_voiced_aspirated, \
-		is_voiceless_aspirated, is_modifier, is_diphthong, is_labiodental, is_dental, is_glottal
+		is_voiceless_aspirated, is_modifier, is_diphthong, is_labiodental, is_dental, is_glottal,\
+		is_samvrit, is_ardhsam, is_ardhviv, is_vivrit, is_lowmid, is_upmid, is_lowhigh, is_high,\
+		is_dvayostha, is_dantya, is_varstya, is_talavya, is_murdhanya, is_komaltalavya, is_nasikya,\
+		is_sparsha, is_parshvika, is_prakampi, is_sangarshi, is_ardhsvar,\
+		is_front, is_mid, is_back, is_long, is_short, is_medium, is_dravidian, is_bangla, is_hard
 	
 def add_basic_features(sentence_terms, index):
 	term = sentence_terms[index]
@@ -209,11 +299,21 @@ def add_basic_features(sentence_terms, index):
 	next_word = '' if index == len(sentence_terms)-1 else sentence_terms[index+1]
 
 	total_vowels, nuktas, total_punctuations, total_numbers, total_consonants, is_voiced_aspirated, \
-		is_voiceless_aspirated, is_modifier, is_diphthong, is_labiodental, is_dental, is_glottal = \
+		is_voiceless_aspirated, is_modifier, is_diphthong, is_labiodental, is_dental, is_glottal, \
+		is_samvrit, is_ardhsam, is_ardhviv, is_vivrit, is_lowmid, is_upmid, is_lowhigh, is_high,\
+		is_dvayostha, is_dantya, is_varstya, is_talavya, is_murdhanya, is_komaltalavya, is_nasikya, \
+		is_sparsha, is_parshvika, is_prakampi, is_sangarshi, is_ardhsvar, \
+		is_front, is_mid, is_back, is_long, is_short, is_medium, is_dravidian, is_bangla, is_hard = \
 				phonetic_features(sentence_terms[index])
-	return length, int(is_first), int(is_last), term, prefix1, prefix2, prefix3, suffix1, suffix2, suffix3, suffix4,\
-		prev_word, next_word, total_vowels, nuktas, total_punctuations, total_numbers, total_consonants, is_voiced_aspirated, \
-		is_voiceless_aspirated, is_modifier, is_diphthong, is_labiodental, is_dental, is_glottal
+	
+	return length, int(is_first), int(is_last), term, prefix1, prefix2, prefix3, suffix1, suffix2, suffix3, suffix4, prev_word, next_word, \
+		total_vowels, nuktas, total_punctuations, total_numbers, total_consonants, is_voiced_aspirated, \
+		is_voiceless_aspirated, is_modifier, is_diphthong, is_labiodental, is_dental, is_glottal, \
+		is_samvrit, is_ardhsam, is_ardhviv, is_vivrit, is_lowmid, is_upmid, is_lowhigh, is_high,\
+		is_dvayostha, is_dantya, is_varstya, is_talavya, is_murdhanya, is_komaltalavya, is_nasikya, \
+		is_sparsha, is_parshvika, is_prakampi, is_sangarshi, is_ardhsvar, \
+		is_front, is_mid, is_back, is_long, is_short, is_medium, is_dravidian, is_bangla, is_hard,\
+			
 
 def untag(tagged_sentence):
     """ 
@@ -314,42 +414,51 @@ def write_output_to_file(testing_sentences, predictions, label_encoder):
 '''
 
 def returnTrainTestSets():
-	sentences = pickle.load(open('./pickle-dumps/sentences_intra', 'rb'))
-	y1 = pickle.load(open('./pickle-dumps/y2_sentencewise', 'rb'))
+	# sentences = pickle.load(open('./pickle-dumps/sentences_intra', 'rb'))
+	# y1 = pickle.load(open('./pickle-dumps/y3_sentencewise', 'rb'))
 
-	test_sent = pickle.load(open('./pickle-dumps/sentences_test', 'rb'))
-	y1_test = pickle.load(open('./pickle-dumps/y2_test', 'rb'))
+	# test_sent = pickle.load(open('./pickle-dumps/sentences_test', 'rb'))
+	# y1_test = pickle.load(open('./pickle-dumps/y3_test', 'rb'))
 												
-	# generate a mapping of word to their tags for the sake of the universe
-	sentences = generate_tuples(sentences, y1)
-	testing_sentences = generate_tuples(test_sent, y1_test)
+	# # generate a mapping of word to their tags for the sake of the universe
+	# sentences = generate_tuples(sentences, y1)
+	# testing_sentences = generate_tuples(test_sent, y1_test)
 
-	flat_features = [item for sublist in y1 for item in sublist]
-	flat_tests = [item for sublist in y1_test for item in sublist]
+	# flat_features = [item for sublist in y1 for item in sublist]
+	# flat_tests = [item for sublist in y1_test for item in sublist]
 
-	flat_features = flat_features + flat_tests
-	tags = get_tag_names(flat_features) # get the names of labels
+	# flat_features = flat_features + flat_tests
+	# tags = get_tag_names(flat_features) # get the names of labels
 
-	X, y = transform_to_dataset(sentences)
-	X_test, y_test = transform_to_dataset(testing_sentences)
+	# X, y = transform_to_dataset(sentences)
+	# X_test, y_test = transform_to_dataset(testing_sentences)
 
-	train_test_cutoff = int(.75 * len(X)) 
-	X_train, y_train = [X[:train_test_cutoff], y[:train_test_cutoff]]
-	X_val, y_val = [X[train_test_cutoff:], y[train_test_cutoff:]]
+	# train_test_cutoff = int(.75 * len(X)) 
+	# X_train, y_train = [X[:train_test_cutoff], y[:train_test_cutoff]]
+	# X_val, y_val = [X[train_test_cutoff:], y[train_test_cutoff:]]
 
-	X_train = encode_all_features(X_train, X_test, X_val, train=True, val=False, test=False)
-	X_test = encode_all_features(X_train, X_test, X_val, y_test, train=False, val=False, test=True)
-	X_val = encode_all_features(X_train, X_test, X_val, train=False, val=True, test=False)
+	# X_train = encode_all_features(X_train, X_test, X_val, train=True, val=False, test=False)
+	# X_test = encode_all_features(X_train, X_test, X_val, y_test, train=False, val=False, test=True)
+	# X_val = encode_all_features(X_train, X_test, X_val, train=False, val=True, test=False)
 
-	y_train, y_val, y_test = process_labels(y_train, y_val, y_test)
+	# y_train, y_val, y_test = process_labels(y_train, y_val, y_test)
 	
-	scaler = MinMaxScaler()
-	scaler.fit(X_train+X_val)
-	X_train = scaler.transform(X_train)
-	X_val = scaler.transform(X_val)
-	X_test = scaler.transform(X_test)
+	# scaler = MinMaxScaler()
+	# scaler.fit(X_train+X_val)
+	# X_train = scaler.transform(X_train)
+	# X_val = scaler.transform(X_val)
+	# X_test = scaler.transform(X_test)
 
-	return len(X_train[1]), X_train, X_test, X_val, y_train, y_test, y_val
+	# pickle.dump(X_train, open('./pickle-dumps/X_train', 'wb'))
+	# pickle.dump(X_test, open('./pickle-dumps/X_test', 'wb'))
+	# pickle.dump(X_val, open('./pickle-dumps/X_val', 'wb'))
+
+	X_train = pickle.load(open('./pickle-dumps/X_train', 'rb'))
+	X_test = pickle.load(open('./pickle-dumps/X_test', 'rb'))
+	X_val = pickle.load(open('./pickle-dumps/X_val', 'rb'))
+	
+	return len(X_train[1]), X_train, X_test, X_val
+	# return len(X_train[1]), X_train, X_test, X_val, y_train, y_test, y_val
 
 if __name__ == '__main__':
 
@@ -358,10 +467,10 @@ if __name__ == '__main__':
 	print(len(X_train))
 	print(len(X_val))
 
-	clf = LogisticRegression()
-	clf.fit(X_train, y_train)
-	# y_test = y_test.reshape(-1,len(y_test[1]))
-	predictions = clf.predict(X_test)
+	# clf = LogisticRegression()
+	# clf.fit(X_train, y_train)
+	# # y_test = y_test.reshape(-1,len(y_test[1]))
+	# predictions = clf.predict(X_test)
 
 	# model = build_model(len(X_train[1]), 56, len(y_train[1]))
 

@@ -1,5 +1,5 @@
 import pickle
-from load_data_with_phonetic import load_data_for_seq2seq, load_data_for_features
+from load_data_with_phonetic_two import load_data_for_seq2seq, load_data_for_features
 
 import keras.backend as K
 from keras.utils import np_utils
@@ -29,35 +29,48 @@ from predict_with_features import plot_model_performance, returnTrainTestSets
 
 # from curve_plotter import plot_precision_recall
 
-MODE = 'trai'
-output_mode = 'write'
 
 EPOCHS = 500
 dropout = 0.2
 TIME_STEPS = 20
-EMBEDDING_DIM = 128
+EMBEDDING_DIM = 64
 BATCH_SIZE = 128
 LAYER_NUM = 2
-no_filters = 200
+no_filters = 64
 filter_length = 4
 HIDDEN_DIM = no_filters*2
 RNN = GRU
-rnn_output_size = 64
+rnn_output_size = 32
 folds = 10
 
 class_labels = []
 
 
+def remove_erroneous_indices(lists):
+	to_be_removed = pickle.load(open('./pickle-dumps/removed_indices', 'rb'))
+	to_be_removed = list(set(to_be_removed)) # for ascending order
+
+	helper_cnt = 0
+	for i in to_be_removed:
+		i = i - helper_cnt
+		for j in range(len(lists)):
+			lists[j].pop(i)
+		helper_cnt = helper_cnt + 1
+
+	return lists
+
+
 def write_words_to_file(orig_words, predictions):
 	print("Writing to file ..")
 	# print(sentences[:10])
-
 	sentences = pickle.load(open('./pickle-dumps/sentences_test', 'rb'))
 
 	X = [item for sublist in sentences for item in sublist]
 	Y = [item for sublist in orig_words for item in sublist]
 
-	filename = "./outputs/only_attention/multitask_context_out.txt"
+	X, Y = remove_erroneous_indices([X,Y])
+
+	filename = "./outputs/freezing_with_luong/multitask_context_out.txt"
 	with open(filename, 'w', encoding='utf-8') as f:
 		f.write("Words" + '\t\t\t' + 'Original Roots' + '\t\t' + "Predicted roots" + '\n')
 		for a, b, c in zip(X, Y, predictions):
@@ -82,7 +95,7 @@ def write_features_to_file(orig_features, pred_features, encoders):
 	words = [item for sublist in sentences for item in sublist]
 
 	for i in range(len(orig_features)):
-		filename = "./outputs/only_attention/feature"+str(i)+"context_out.txt"
+		filename = "./outputs/freezing_with_luong/feature"+str(i)+"context_out.txt"
 		with open(filename, 'w', encoding='utf-8') as f:
 			f.write("Word" + '\t\t' + 'Original feature' + '\t' + 'Predicted feature' + '\n')
 			for a,b,c in zip(words, orig_features[i], pred_features[i]):
@@ -188,24 +201,12 @@ def process_data(word_sentences, max_len, word_to_ix):
 			sequences[i, j, word] = 1
 	return sequences
 
-# def highway_layers(value, n_layers, activation='tanh', gate_bias=-3):
-# 	dim = K.int_shape(value)[-1]
-# 	gate_bias_initializer = keras.initializers.Constant(gate_bias)
-
-# 	for i in range(n_layers):
-# 		gate = Dense(dim, bias_initializer=gate_bias_initializer)(value)
-# 		gate = Activation('sigmoid')(gate)
-# 		negated_gate = Lambda(lambda x: 1.0-x, output_shape=(dim,))(gate)
-
-# 		transformed = Dense(dim)(value)
-# 		transformed = 
 def create_model(X_vocab_len, X_max_len, y_vocab_len, y_max_len, n_phonetic_features, y1, n1, y2, n2, y3, n3, y4, n4, y5, n5, y6, n6,
 				 hidden_size, num_layers):
 	def smart_merge(vectors, **kwargs):
 		return vectors[0] if len(vectors) == 1 else merge(vectors, **kwargs)
 
 	current_word = Input(shape=(X_max_len,), dtype='float32', name='input1') # for encoder (shared)
-	root_word = Input(shape=(X_max_len,), dtype='float32', name='input2')
 	decoder_input = Input(shape=(X_max_len,), dtype='float32', name='input3') # for decoder -- attention
 	right_word1 = Input(shape=(X_max_len,), dtype='float32', name='input4')
 	right_word2 = Input(shape=(X_max_len,), dtype='float32', name='input5')
@@ -221,18 +222,16 @@ def create_model(X_vocab_len, X_max_len, y_vocab_len, y_max_len, n_phonetic_feat
 						  input_length=X_max_len,
 						  mask_zero=False, name='Embedding')
 
-	list_of_inputs = [current_word, root_word, right_word1, right_word2, right_word3,right_word4, 
+	list_of_inputs = [current_word, right_word1, right_word2, right_word3,right_word4, 
 					left_word1, left_word2, left_word3, left_word4]
 
-	current_word_embedding, root_word_embedding, right_word_embedding1, right_word_embedding2,right_word_embedding3, right_word_embedding4, \
+	current_word_embedding, right_word_embedding1, right_word_embedding2,right_word_embedding3, right_word_embedding4, \
 		left_word_embedding1, left_word_embedding2, left_word_embedding3, left_word_embedding4 = [emb_layer1(i) for i in list_of_inputs]
 
-	print("Typeeeee:: ",type(current_word_embedding))
-	current_word_embedding = smart_merge([current_word_embedding, root_word_embedding]) # concatenate root word with current input
+	print("Type:: ",type(current_word_embedding))
 	list_of_embeddings1 = [current_word_embedding, right_word_embedding1, right_word_embedding2,right_word_embedding3, right_word_embedding4, \
 		left_word_embedding1, left_word_embedding2, left_word_embedding3, left_word_embedding4]
 
-	# list_of_embeddings = [smart_merge([i,root_word_embedding]) for i in list_of_embeddings] # concatenate root word with each of inputs
 	list_of_embeddings = [Dropout(0.50, name='drop1_'+str(j))(i) for i,j in zip(list_of_embeddings1, range(len(list_of_embeddings1)))]
 	list_of_embeddings = [GaussianNoise(0.05, name='noise1_'+str(j))(i) for i,j in zip(list_of_embeddings, range(len(list_of_embeddings)))]
 	
@@ -269,11 +268,9 @@ def create_model(X_vocab_len, X_max_len, y_vocab_len, y_max_len, n_phonetic_feat
 		pool5_left1, pool5_left2, pool5_left3, pool5_left4]
 
 	concat = merge(maxPools, mode='concat', name='main_merge')
-	# curr_vector_total = smart_merge([pool4_curr, pool5_curr], mode='concat')
 
 	x = Dropout(0.15, name='drop_single1')(concat)
-
-	x = Bidirectional(RNN(rnn_output_size, name='rnn_for_features'))(x)
+	x = Bidirectional(RNN(rnn_output_size), name='bidirec1')(x)
 
 	total_features = [x, phonetic_input]
 	concat2 = merge(total_features, mode='concat', name='phonetic_merging')
@@ -281,7 +278,6 @@ def create_model(X_vocab_len, X_max_len, y_vocab_len, y_max_len, n_phonetic_feat
 	x = Dense(HIDDEN_DIM, activation='relu', kernel_initializer='he_normal',
 			  kernel_constraint= maxnorm(3), bias_constraint=maxnorm(3), name='dense1')(concat2)
 	x = Dropout(0.15, name='drop_single2')(x)
-
 	x = Dense(HIDDEN_DIM, kernel_initializer='he_normal', activation='tanh',
 			  kernel_constraint= maxnorm(3), bias_constraint=maxnorm(3), name='dense2')(x)
 	x = Dropout(0.15, name='drop_single3')(x)
@@ -298,16 +294,16 @@ def create_model(X_vocab_len, X_max_len, y_vocab_len, y_max_len, n_phonetic_feat
 						  input_length=X_max_len,
 						  mask_zero=True, name='Embedding_for_seq2seq')
 
-	current_word_embedding, root_word_embedding, right_word_embedding1, right_word_embedding2,right_word_embedding3, right_word_embedding4, \
+	current_word_embedding, right_word_embedding1, right_word_embedding2,right_word_embedding3, right_word_embedding4, \
 		left_word_embedding1, left_word_embedding2, left_word_embedding3, left_word_embedding4 = [emb_layer(i) for i in list_of_inputs]
 
-	current_word_embedding = smart_merge([ current_word_embedding, right_word_embedding1, right_word_embedding2,  left_word_embedding1, left_word_embedding2])
+	# current_word_embedding = smart_merge([ current_word_embedding, right_word_embedding1,  left_word_embedding1])
 
-	encoder, state = GRU(64, return_sequences=True, unroll=True, return_state=True, name='encoder')(current_word_embedding)
+	encoder, state = GRU(rnn_output_size, return_sequences=True, unroll=True, return_state=True, name='encoder')(current_word_embedding)
 	encoder_last = encoder[:,-1,:]
 
 	decoder = emb_layer(decoder_input)
-	decoder = GRU(64, return_sequences=True, unroll=True, name='decoder')(decoder, initial_state=[state])
+	decoder = GRU(rnn_output_size, return_sequences=True, unroll=True, name='decoder')(decoder, initial_state=[encoder_last])
 
 	attention = dot([decoder, encoder], axes=[2,2], name='dot')
 	attention = Activation('softmax', name='attention')(attention)
@@ -315,19 +311,15 @@ def create_model(X_vocab_len, X_max_len, y_vocab_len, y_max_len, n_phonetic_feat
 	context = dot([attention, encoder], axes=[2,1], name='dot2')
 	decoder_combined_context = concatenate([context, decoder], name='concatenate')
 
-	outputs = TimeDistributed(Dense(64, activation='tanh', name='td1'))(decoder_combined_context)
-	outputs = TimeDistributed(Dense(X_vocab_len, activation='softmax',  name='td2'))(outputs)
+	outputs = TimeDistributed(Dense(64, activation='tanh'), name='td1')(decoder_combined_context)
+	outputs = TimeDistributed(Dense(X_vocab_len, activation='softmax'),  name='td2')(outputs)
 
-
-	all_inputs = [current_word, root_word, decoder_input, right_word1, right_word2, right_word3, right_word4, left_word1, left_word2, left_word3,\
+	all_inputs = [current_word, decoder_input, right_word1, right_word2, right_word3, right_word4, left_word1, left_word2, left_word3,\
 				  left_word4, phonetic_input]
 	all_outputs = [outputs, out1, out2, out3, out4, out5, out6]
 
 	model = Model(input=all_inputs, output=all_outputs)
 	opt = Adam()
-	model.compile(optimizer=Adadelta(epsilon=1e-06), loss='categorical_crossentropy',
-				  metrics=['accuracy'],
-				  loss_weights=[1., .5, .5, .5, .5, .5, .5])
 
 	return model
 
@@ -335,7 +327,7 @@ sentences = pickle.load(open('./pickle-dumps/sentences_intra', 'rb'))
 rootwords = pickle.load(open('./pickle-dumps/rootwords_intra', 'rb'))
 features = pickle.load(open('./pickle-dumps/features_intra', 'rb'))
 
-n_phonetics, X_train_phonetics, X_test_phonetics, X_val_phonetics, _, _, _ = returnTrainTestSets()
+n_phonetics, X_train_phonetics, X_test_phonetics, X_val_phonetics = returnTrainTestSets()
 
 # we keep X_idx2word and y_idx2word the same
 # X_left & X_right = X shifted to one and two positions left and right for context2
@@ -367,27 +359,16 @@ y = pad_sequences(y, maxlen = X_max_len, dtype = 'int32', padding='post')
 print("Compiling Model ..")
 model = create_model(X_vocab_len, X_max_len, y_vocab_len, X_max_len, n_phonetics,
 					 y1, n1, y2, n2, y3, n3, y4, n4, y5, n5, y7, n7, HIDDEN_DIM, LAYER_NUM)
+model.compile(optimizer=Adadelta(epsilon=1e-06), loss='categorical_crossentropy',
+			  metrics=['accuracy'])
 
-saved_weights = "./model_weights/charCNN_with_attention.hdf5"
+pseudo_model = create_model(X_vocab_len, X_max_len, y_vocab_len, X_max_len, n_phonetics,
+					 y1, n1, y2, n2, y3, n3, y4, n4, y5, n5, y7, n7, HIDDEN_DIM, LAYER_NUM)
 
-def generate(X_test, rest_features, y_max_len):
-	encoder_input = X_test
-	decoder_input = np.zeros(shape=(len(encoder_input), y_max_len))
-	decoder_input[:,0] = 1
+saved_weights = "./model_weights/training_weights.hdf5"
 
-	X_left1, X_left2, X_left3, X_left4, X_right1, X_right2, X_right3, X_right4, X_phonetic_features
-	for i in range(1, y_max_len):
-	    output, _, _, _, _, _, _ = model.predict([encoder_input, decoder_input, X_left1, X_left2, X_left3, X_left4, X_right1, X_right2, X_right3, X_right4, X_phonetic_features])
-	    decoder_input[:,i] = output.argmax(axis=2)[:,i]
-	return decoder_input[:,1:]
+MODE = 'trai'
 
-def decode(decoding, sequence):
-    text = ''
-    for i in sequence:
-        if i == 0:
-            break
-        text += output_decoding[i]
-    return text
 if MODE == 'train':
 	print("Training model ..")
 	plot_model(model, to_file="CNNRNN_with_both_pooling.png", show_shapes=True)
@@ -417,23 +398,48 @@ if MODE == 'train':
 	X_decoder_val[:, 1:] = X_val[:,:-1]
 	X_decoder_val[:, 0] = 1
 
-	hist = model.fit([X_train, y_train, X_decoder_input,  X_right1_tr, X_right2_tr, X_right3_tr, X_right4_tr, X_left1_tr, X_left2_tr, X_left3_tr, X_left4_tr, X_train_phonetics],
-					 [y_sequences_tr, y1_tr, y2_tr, y3_tr, y4_tr, y5_tr, y7_tr],
-					 validation_data=([X_val, y_val, X_decoder_val,  X_right1_val, X_right2_val, X_right3_val, X_right4_val, X_left1_val, X_left2_val, X_left3_val, X_left4_val, X_val_phonetics],\
-					 	[y_sequences_val, y1_val, y2_val, y3_val, y4_val, y5_val, y7_val]),
-					 batch_size=BATCH_SIZE, epochs=EPOCHS,
-					 callbacks=[ModelCheckpoint('./model_weights/charCNN_with_attention.hdf5', 	verbose=1, save_weights_only=True)])
+	hist = model.fit([X_train, X_decoder_input,  X_right1_tr, X_right2_tr, X_right3_tr, X_right4_tr, X_left1_tr, X_left2_tr, X_left3_tr, X_left4_tr, X_train_phonetics],
+				 [y_sequences_tr, y1_tr, y2_tr, y3_tr, y4_tr, y5_tr, y7_tr],
+				 validation_data=([X_val, X_decoder_val,  X_right1_val, X_right2_val, X_right3_val, X_right4_val, X_left1_val, X_left2_val, X_left3_val, X_left4_val, X_val_phonetics],\
+				 [y_sequences_val, y1_val, y2_val, y3_val, y4_val, y5_val, y7_val]),
+				 batch_size=BATCH_SIZE, epochs=50, 
+				 callbacks=[EarlyStopping(patience=10),
+								ModelCheckpoint('./model_weights/training_weights1.hdf5', save_best_only=True,
+												verbose=1, save_weights_only=True)])
 
-	model.save('./model_weights/attention_with_roots.hdf5')
-	print(hist.history.keys())
-	print(hist)
-	plot_model_performance(
-		train_loss=hist.history.get('loss', []),
-		train_acc=hist.history.get('acc', []),
-		train_val_loss=hist.history.get('val_loss', []),
-		train_val_acc=hist.history.get('val_acc', [])
-	)
+	print("Setting weights now.. ")
+	model.load_weights('./model_weights/training_weights.hdf5')
+	names_to_be_freezed = ['Embedding', 'merge_1', 'drop1_0', 'drop1_1', 'drop1_2', 'drop1_3', 'drop1_4', 'drop1_5', 'drop1_6', 'drop1_7', 
+		'drop1_8', 'noise1_0', 'noise1_1', 'noise1_2', 'noise1_3', 'noise1_4', 'noise1_5', 'noise1_6', 'noise1_7', 'noise1_8', 
+		'conv4_0', 'conv4_1', 'conv4_2', 'conv4_3', 'conv4_4', 'conv4_5', 'conv4_6', 'conv4_7', 'conv4_8', 'conv5_0', 'conv5_1', 
+		'conv5_2', 'conv5_3', 'conv5_4', 'conv5_5', 'conv5_6', 'conv5_7', 'conv5_8',  'max4_0', 'avg4_0', 'max4_1', 'avg4_1', 'max4_2', 
+		'avg4_2', 'max4_3', 'avg4_3', 'max4_4', 'avg4_4', 'max4_5', 'avg4_5', 'max4_6', 'avg4_6', 'max4_7', 'avg4_7', 'max4_8', 'avg4_8', 
+		'max5_0', 'avg5_0', 'max5_1', 'avg5_1', 'max5_2', 'avg5_2', 'max5_3', 'avg5_3', 'max5_4', 'avg5_4', 'max5_5', 'avg5_5', 'max5_6', 
+		'avg5_6', 'max5_7', 'avg5_7', 'max5_8', 'avg5_8',  'merge_conv4_0', 'merge_conv4_1', 'merge_conv4_2', 'merge_conv4_3', 'merge_conv4_4',
+		'merge_conv4_5', 'merge_conv4_6', 'merge_conv4_7', 'merge_conv4_8', 'merge_conv5_0', 'merge_conv5_1', 'merge_conv5_2', 'merge_conv5_3',
+		'merge_conv5_4', 'merge_conv5_5', 'merge_conv5_6', 'merge_conv5_7', 'merge_conv5_8', 'merge_2', 'main_merge',  'drop_single1',
+		'bidirec1', 'phonetic_merging',  'dense1', 'drop_single2', 'dense2',  'drop_single3', 'output1', 'output2', 'output3', 'output4', 
+		'output5', 'output6']
+	
+	for (i,j) in zip(model.layers, pseudo_model.layers):
+		if i.name == j.name:
+			print("Setting weights of layer: " + str(i.name))
+			pseudo_model.get_layer(j.name).set_weights(model.get_layer(i.name).get_weights())
 
+	for name in names_to_be_freezed:
+		print("Freezing layers now..")
+		layer = pseudo_model.get_layer(name)
+		if layer is not None:
+			pseudo_model.get_layer(name).trainable = False
+
+	pseudo_model.compile(optimizer=Adadelta(epsilon=1e-06), loss='categorical_crossentropy', metrics=['accuracy'])
+	hist = pseudo_model.fit([X_train, X_decoder_input,  X_right1_tr, X_right2_tr, X_right3_tr, X_right4_tr, X_left1_tr, X_left2_tr, X_left3_tr, X_left4_tr, X_train_phonetics],
+				 [y_sequences_tr, y1_tr, y2_tr, y3_tr, y4_tr, y5_tr, y7_tr],
+				 validation_data=([X_val, X_decoder_val,  X_right1_val, X_right2_val, X_right3_val, X_right4_val, X_left1_val, X_left2_val, X_left3_val, X_left4_val, X_val_phonetics],\
+				 [y_sequences_val, y1_val, y2_val, y3_val, y4_val, y5_val, y7_val]),
+				 batch_size=BATCH_SIZE, epochs=200,
+				 callbacks=[ModelCheckpoint('./model_weights/frozen_training_weights1.hdf5',
+												verbose=1, save_weights_only=True)])
 
 else:
 	if len(saved_weights) == 0:
@@ -470,25 +476,22 @@ else:
 		decoder_input[:, 1:] = X_test[:,:-1]
 		decoder_input[:, 0] = 1
 
+		
 		model.load_weights(saved_weights)
 		print(model.summary())
 
-		# rest_features = [y_test, X_left1, X_left2, X_left3, X_left4, X_right1, X_right2, X_right3, X_right4, X_phonetic_features]
+		# for i, layer in enumerate(model.layers):
+		# 	print(i, layer.name)
 
-		# sequences = []
-		# for i in range(len(X_test)):
-		# 	decoder_output = generate(X_test[i], rest_features[:][i])
-		# 	text = decode(y_ix_to_word, decoder_output)
-		# 	sequences.append(text)
-
-		print(model.evaluate([X_test, y_test, decoder_input,  X_right1, X_right2, X_right3, X_right4, X_left1, X_left2, X_left3, X_left4, X_phonetic_features],
+		print(model.evaluate([X_test, decoder_input,  X_right1, X_right2, X_right3, X_right4, X_left1, X_left2, X_left3, X_left4, X_phonetic_features],
 							 [y_test_seq, y1, y2, y3, y4, y5, y7]))
-		# # print(model.metrics_names)
+		# # # print(model.metrics_names)
 
 		words, f1, f2, f3, f4, f5, f7 = model.predict(
-			[X_test, y_test, decoder_input, X_right1, X_right2, X_right3, X_right4, X_left1, X_left2, X_left3, X_left4, X_phonetic_features])
+			[X_test, decoder_input, X_right1, X_right2, X_right3, X_right4, X_left1, X_left2, X_left3, X_left4, X_phonetic_features])
 
 		predictions = np.argmax(words, axis=2)
+		pickle.dump(predictions, open('./pickle-dumps/predictions', 'wb'))
 
 		pred_features = [f1, f2, f3, f4, f5, f7]
 		orig_features = [y1, y2, y3, y4, y5, y7]
@@ -521,4 +524,5 @@ else:
 			#print(test_sample_num,":", sequence)
 			sequences.append(sequence)
 
+		print(sequences[:10])
 		write_words_to_file(test_roots, sequences)
