@@ -12,7 +12,7 @@ from keras.layers.wrappers import Bidirectional
 from keras.layers.core import Layer
 from keras.optimizers import Adam, Adadelta
 from keras.utils import plot_model
-from keras.callbacks import EarlyStopping, ModelCheckpoint, Callback
+from keras.callbacks import EarlyStopping, ModelCheckpoint, Callback, ReduceLROnPlateau
 from keras import initializers, regularizers, constraints
 from attention_decoder import AttentionDecoder
 from attention_encoder import AttentionWithContext
@@ -70,7 +70,7 @@ def write_words_to_file(orig_words, predictions):
 
 	X, Y = remove_erroneous_indices([X,Y])
 
-	filename = "./outputs/freezing_with_luong/multitask_context_out.txt"
+	filename = "./outputs/freezing_with_luong/multitask_context_out1.txt"
 	with open(filename, 'w', encoding='utf-8') as f:
 		f.write("Words" + '\t\t\t' + 'Original Roots' + '\t\t' + "Predicted roots" + '\n')
 		for a, b, c in zip(X, Y, predictions):
@@ -95,7 +95,7 @@ def write_features_to_file(orig_features, pred_features, encoders):
 	words = [item for sublist in sentences for item in sublist]
 
 	for i in range(len(orig_features)):
-		filename = "./outputs/freezing_with_luong/feature"+str(i)+"context_out.txt"
+		filename = "./outputs/freezing_with_luong/feature"+str(i)+"context_out1.txt"
 		with open(filename, 'w', encoding='utf-8') as f:
 			f.write("Word" + '\t\t' + 'Original feature' + '\t' + 'Predicted feature' + '\n')
 			for a,b,c in zip(words, orig_features[i], pred_features[i]):
@@ -189,6 +189,8 @@ def process_features(y1,y2,y3,y4,y5,y7,y8, n = None, enc=None):
 	y7 = np_utils.to_categorical(y7, num_classes=n6)
 	y8 = np_utils.to_categorical(y8, num_classes=n7)
 
+	pickle.dump(enc, open('./pickle-dumps/enc','wb'))
+	print("Encoders dumped ################################################")
 	return (y1, n1, y2, n2, y3, n3, y4, n4, y5, n5, y7, n6, y8, n7, enc, labels)
 
 
@@ -344,6 +346,13 @@ X_max = max([len(word) for word in X])
 y_max = max([len(word) for word in y])
 X_max_len = max(X_max, y_max)
 
+print(X_max_len)
+print(X_vocab_len)
+
+pickle.dump(n, open('./pickle-dumps/n', 'wb'))
+pickle.dump(X_max_len, open('./pickle-dumps/X-max-len', 'wb'))
+pickle.dump(X_vocab_len, open('./pickle-dumps/X_vocab_len', 'wb'))
+
 print("Zero padding .. ")
 X = pad_sequences(X, maxlen= X_max_len, dtype = 'int32', padding='post')
 X_left1 = pad_sequences(X_left1, maxlen = X_max_len, dtype='int32', padding='post')
@@ -359,13 +368,13 @@ y = pad_sequences(y, maxlen = X_max_len, dtype = 'int32', padding='post')
 print("Compiling Model ..")
 model = create_model(X_vocab_len, X_max_len, y_vocab_len, X_max_len, n_phonetics,
 					 y1, n1, y2, n2, y3, n3, y4, n4, y5, n5, y7, n7, HIDDEN_DIM, LAYER_NUM)
-model.compile(optimizer=Adadelta(epsilon=1e-06), loss='categorical_crossentropy',
+model.compile(optimizer=Adadelta(), loss='categorical_crossentropy',
 			  metrics=['accuracy'])
 
 pseudo_model = create_model(X_vocab_len, X_max_len, y_vocab_len, X_max_len, n_phonetics,
 					 y1, n1, y2, n2, y3, n3, y4, n4, y5, n5, y7, n7, HIDDEN_DIM, LAYER_NUM)
 
-saved_weights = "./model_weights/training_weights.hdf5"
+saved_weights = "./model_weights/frozen_training_weights.hdf5"
 
 MODE = 'trai'
 
@@ -405,7 +414,8 @@ if MODE == 'train':
 				 batch_size=BATCH_SIZE, epochs=50, 
 				 callbacks=[EarlyStopping(patience=10),
 								ModelCheckpoint('./model_weights/training_weights1.hdf5', save_best_only=True,
-												verbose=1, save_weights_only=True)])
+												verbose=1, save_weights_only=True),
+								ReduceLROnPlateau(monitor='val_loss', factor=0.2, patience=7, min_lr=0.0001)])
 
 	print("Setting weights now.. ")
 	model.load_weights('./model_weights/training_weights.hdf5')
@@ -432,14 +442,16 @@ if MODE == 'train':
 		if layer is not None:
 			pseudo_model.get_layer(name).trainable = False
 
-	pseudo_model.compile(optimizer=Adadelta(epsilon=1e-06), loss='categorical_crossentropy', metrics=['accuracy'])
+	pseudo_model.compile(optimizer=Adadelta(), loss='categorical_crossentropy', metrics=['accuracy'])
 	hist = pseudo_model.fit([X_train, X_decoder_input,  X_right1_tr, X_right2_tr, X_right3_tr, X_right4_tr, X_left1_tr, X_left2_tr, X_left3_tr, X_left4_tr, X_train_phonetics],
 				 [y_sequences_tr, y1_tr, y2_tr, y3_tr, y4_tr, y5_tr, y7_tr],
 				 validation_data=([X_val, X_decoder_val,  X_right1_val, X_right2_val, X_right3_val, X_right4_val, X_left1_val, X_left2_val, X_left3_val, X_left4_val, X_val_phonetics],\
 				 [y_sequences_val, y1_val, y2_val, y3_val, y4_val, y5_val, y7_val]),
 				 batch_size=BATCH_SIZE, epochs=200,
-				 callbacks=[ModelCheckpoint('./model_weights/frozen_training_weights1.hdf5',
-												verbose=1, save_weights_only=True)])
+				 callbacks=[EarlyStopping(patience=8),
+				 			ModelCheckpoint('./model_weights/frozen_training_weights1.hdf5',
+												save_best_only=True, verbose=1, save_weights_only=True),
+				 			ReduceLROnPlateau(monitor='val_loss', factor=0.2, patience=5, min_lr=0.000001)])
 
 else:
 	if len(saved_weights) == 0:
@@ -447,8 +459,10 @@ else:
 		sys.exit()
 	else:
 		test_sample_num = 0
-
+		# FILENAME = './test_file.txt'
 		test_sentences = pickle.load(open('./pickle-dumps/sentences_test', 'rb'))
+		# test_sentences = [line for line in open(FILENAME)]
+		# test_sentences = open(FILENAME).readlines()
 		test_roots = pickle.load(open('./pickle-dumps/rootwords_test', 'rb'))
 		test_features = pickle.load(open('./pickle-dumps/features_test', 'rb'))
 

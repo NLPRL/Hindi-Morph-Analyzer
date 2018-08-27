@@ -13,7 +13,7 @@ MAX_LEN = 20
 VOCAB_SIZE = 65
 VOCAB_SIZE_WORDS = 30000
 
-def getIndexedWords(X_unique, y_unique, orig=False):
+def getIndexedWords(X_unique, y_unique, orig=False, test=False):
 	X_un = [list(x) for x,w in zip(X_unique, y_unique) if len(x) > 0 and len(w) > 0]
 
 	X = X_un
@@ -28,18 +28,18 @@ def getIndexedWords(X_unique, y_unique, orig=False):
 		if i[0] == '\u200d' or i[0] == '\u200b':
 			X_vocab.remove(i)
 
-	#print(X_vocab)
+	if test == True:
+		X_word2idx = pickle.load(open('./pickle-dumps/X_word2idx', 'rb'))
+		X_idx2word = pickle.load(open('./pickle-dumps/X_idx2word', 'rb'))
 
-	X_idx2word = [letter[0] for letter in X_vocab]
-	X_idx2word.insert(0, 'Z') # 'Z' is the starting token
-	X_idx2word.append('W') # 'U' for out-of-vocab characters
-	
-	# create letter-to-index mapping
-	X_word2idx =  {letter:idx for idx, letter in enumerate(X_idx2word)}
+	else:
+		X_idx2word = [letter[0] for letter in X_vocab]
+		X_idx2word.insert(0, 'Z') # 'Z' is the starting token
+		X_idx2word.append('U') # 'U' for out-of-vocab characters
+		
+		# create letter-to-index mapping
+		X_word2idx =  {letter:idx for idx, letter in enumerate(X_idx2word)}
 
-	# print(X_idx2word)
-	#print(len(X_idx2word))
-	#print(len(X_word2idx))
 	for i, word in enumerate(X):
 		for j, char in enumerate(word):
 			if char in X_word2idx:
@@ -88,7 +88,7 @@ def load_data_for_seq2seq(sentences, rootwords, X_phonetic=None, features=None, 
 	context4=False, context5=False):
 	#print(sentences[:2])
 	
-	X_unique = [item for sublist in sentences for item in sublist]
+	X_unique = [item[::-1] for sublist in sentences for item in sublist]
 	y_unique = [item for sublist in rootwords for item in sublist]
 
 
@@ -123,8 +123,14 @@ def load_data_for_seq2seq(sentences, rootwords, X_phonetic=None, features=None, 
 	#####################################################
 
 	# process vocab indexing for X in the function since we will need to call it multiple times
-	X, X_un, X_vocab, X_word2idx, X_idx2word = getIndexedWords(X_unique, y_unique, orig=True)
-	#print(X[:10])
+	X, X_un, X_vocab, X_word2idx, X_idx2word = getIndexedWords(X_unique, y_unique, orig=True, test=test)
+
+	if test == False:
+		pickle.dump(X_word2idx, open('./pickle-dumps/X_word2idx', 'wb'))
+		pickle.dump(X_idx2word, open('./pickle-dumps/X_idx2word', 'wb'))
+	else:
+		# pickle.dump(removed_indices, open('./pickle-dumps/removed_indices', 'wb'))
+		X_word2idx = pickle.load(open('./pickle-dumps/X_word2idx', 'rb'))
 
 	# process vocab indexing for y here, since only single processing required
 	y_un = [list(w) for x,w in zip(X_unique, y_unique) if len(x) > 0 and len(w) > 0]	
@@ -146,27 +152,27 @@ def load_data_for_seq2seq(sentences, rootwords, X_phonetic=None, features=None, 
 		X_left.append(' ') # all elements would be shifted one left
 		X_left.popleft()
 		X_left1 = list(X_left)
-		X_left1 = getIndexedWords(X_left1, y_unique, orig=False)
+		X_left1 = getIndexedWords(X_left1, y_unique, orig=False, test=test)
 
 		X_left.append(' ')
 		X_left.popleft()
 		X_left2 = list(X_left)
-		X_left2 = getIndexedWords(X_left2, y_unique, orig=False)
+		X_left2 = getIndexedWords(X_left2, y_unique, orig=False, test=test)
 		
 		X_left.append(' ')
 		X_left.popleft()
 		X_left3 = list(X_left)
-		X_left3 = getIndexedWords(X_left3, y_unique, orig=False)
+		X_left3 = getIndexedWords(X_left3, y_unique, orig=False, test=test)
 
 		X_left.append(' ')
 		X_left.popleft()
 		X_left4 = list(X_left)
-		X_left4 = getIndexedWords(X_left4, y_unique, orig=False)	
+		X_left4 = getIndexedWords(X_left4, y_unique, orig=False, test=test)	
 
 		X_left.append(' ')
 		X_left.popleft()
 		X_left5 = list(X_left)
-		X_left5 = getIndexedWords(X_left5, y_unique, orig=False)	
+		X_left5 = getIndexedWords(X_left5, y_unique, orig=False, test=test)	
 
 		X_right_orig = X_unique
 		X_right = deque(X_right_orig)
@@ -174,27 +180,27 @@ def load_data_for_seq2seq(sentences, rootwords, X_phonetic=None, features=None, 
 		X_right.appendleft(' ') 
 		X_right.pop()
 		X_right1 = list(X_right)
-		X_right1 = getIndexedWords(X_right1, y_unique, orig=False)
+		X_right1 = getIndexedWords(X_right1, y_unique, orig=False, test=test)
 
 		X_right.appendleft(' ')
 		X_right.pop()
 		X_right2 = list(X_right)
-		X_right2 = getIndexedWords(X_right2, y_unique, orig=False)
+		X_right2 = getIndexedWords(X_right2, y_unique, orig=False, test=test)
 
 		X_right.appendleft(' ')
 		X_right.pop()
 		X_right3 = list(X_right)
-		X_right3 = getIndexedWords(X_right3, y_unique, orig=False)
+		X_right3 = getIndexedWords(X_right3, y_unique, orig=False, test=test)
 
 		X_right.appendleft(' ')
 		X_right.pop()
 		X_right4 = list(X_right)
-		X_right4 = getIndexedWords(X_right4, y_unique, orig=False)
+		X_right4 = getIndexedWords(X_right4, y_unique, orig=False, test=test)
 
 		X_right.appendleft(' ')
 		X_right.pop()
 		X_right5 = list(X_right)
-		X_right5 = getIndexedWords(X_right5, y_unique, orig=False)
+		X_right5 = getIndexedWords(X_right5, y_unique, orig=False, test=test)
 
 		print(len(X_left1))
 		print(len(X_left2))
@@ -283,27 +289,27 @@ def load_data_for_features(features, sentences=None):
 			else:
 				j.append('Unk')
 
-	if sentences != None:
-		dist = FreqDist(np.hstack(sentences))
-		X_vocab = dist.most_common(VOCAB_SIZE_WORDS)
+	# if sentences != None:
+	# 	dist = FreqDist(np.hstack(sentences))
+	# 	X_vocab = dist.most_common(VOCAB_SIZE_WORDS)
 
-		X_idx2word = [word[0] for word in X_vocab]
-		X_idx2word.insert(0, 'ZERO')
-		X_idx2word.append('UNK')
+	# 	X_idx2word = [word[0] for word in X_vocab]
+	# 	X_idx2word.insert(0, 'ZERO')
+	# 	X_idx2word.append('UNK')
 
-		X_idx2word = [word[0] for word in X_vocab]
-		X_idx2word.insert(0, 'ZERO')
-		X_idx2word.append('UNK')
+	# 	X_idx2word = [word[0] for word in X_vocab]
+	# 	X_idx2word.insert(0, 'ZERO')
+	# 	X_idx2word.append('UNK')
 
-		X_word2idx = {word:idx for idx,word in enumerate(X_idx2word)}
+	# 	X_word2idx = {word:idx for idx,word in enumerate(X_idx2word)}
 
-		X = sentences
-		for i, sentence in enumerate(X):
-			for j, word in enumerate(sentence):
-				if word in X_word2idx:
-					X[i][j] = X_word2idx[word]
-				else:
-					X[i][j] = X_word2idx['UNK']
+	# 	X = sentences
+	# 	for i, sentence in enumerate(X):
+	# 		for j, word in enumerate(sentence):
+	# 			if word in X_word2idx:
+	# 				X[i][j] = X_word2idx[word]
+	# 			else:
+	# 				X[i][j] = X_word2idx['UNK']
 	
 	return (y1, y2, y3, y4, y5, y6, y7, y8)
 
@@ -365,16 +371,3 @@ def load_data_for_features_sentencewise(features):
 sentences = pickle.load(open('./pickle-dumps/sentences_intra', 'rb'))
 rootwords = pickle.load(open('./pickle-dumps/rootwords_intra', 'rb'))
 features = pickle.load(open('./pickle-dumps/features_intra', 'rb'))
-
-#load_data_for_features_sentencewise(features)
-
-
-# we keep X_idx2word and y_idx2word the same
-#X, X_vocab_len, X_word_to_ix, X_ix_to_word, y, y_vocab_len, y_word_to_ix, y_ix_to_word, X_left, X_right =
-load_data_for_seq2seq(sentences, rootwords, context2=True)
-#load_data_for_features_sentencewise(features)
-'''
-print(X[:5])
-print(X_left[:5])
-print(X_right[:5])
-'''
