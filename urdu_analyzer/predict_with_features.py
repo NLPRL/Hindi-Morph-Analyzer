@@ -224,25 +224,10 @@ def height(text):
 
 aspirated = ["کھ",'گھ','چھ','جھ','ٹھ','ڈھ','تھ','دھ','پھ','بھ','ش','س','ح']
 
-def phonetic_features(word):
-	vowels = [u'\u0905', u'\u0906', u'\u0907', u'\u0908', u'\u0909', 
-		u'\u090A', u'\u090B', u'\u090C', u'\u090D', u'\u090E', u'\u090F', 
-		u'\u0910', u'\u0911', u'\u0912', u'\u0913', u'\u0914']
-	nukta = u'\u093c'
-	halant = u'\u094D'
-	numbers = [u'\u0966', u'\u0967', u'\u0968', u'\u0969', u'\u096A', 
-		u'\u096B', u'\u096C', u'\u096D', u'\u096E', u'\u096F']
-	punctuations = [u'\u0970', u'\u0971', u'\u002c', u'\u003B', 
-		u'\u003f', u'\u0021', u'\u2013', u'\u002D', u'\u0022',]
-	matras = [u'\u093A', u'\u093B', u'\u093C', u'\u093D', u'\u093E', u'\u093F',
-		u'\u0940', u'\u0941', u'\u0942'	, u'\u0943'	, u'\u0944'	, u'\u0945'	,
-	  	u'\u0946', u'\u0947', u'\u0948'	, u'\u0949'	, u'\u094A'	, u'\u094B'	, 
-	  	u'\u094C', u'\u094E', u'\u094F']
-	voiced_aspirated = [u'\u092D', u'\u0922', u'\u0927', u'\u091D', u'\u0918', u'\u0923']
-	voiceless_aspirated = [u'\u092B', u'\u0920', u'\u0925', u'\u091B', u'\u0916']
-	modifiers = [u'\u0902', u'\u0901', u'\u0903']
-	diphthongs = [u'\u090D', u'\u090E', u'\u090F', u'\u0910', u'\u0911', u'\u0912', u'\u0913', u'\u0914']
-
+text = "فتور"
+print(list(text))
+print(prayatna(text))
+print(get_type(text))
 	total_vowels = sum([word.count(i) for i in vowels])
 	nuktas = word.count(nukta)
 	total_punctuations = sum([word.count(i) for i in punctuations])
