@@ -144,100 +144,85 @@ def process_labels(y_train, y_val, y_test):
 	# y_val = np_utils.to_categorical(y_val)
 
 	return y_train, y_val, y_test
+# ‍vowels = [' ث','ے',' س','ص','ھ','ع','ذ', 'ظ','ض','ز',' ں','ء','ہ']
+#
+# retroflexes = ['ٿ'‬, 'ڐ'‬, 'ڙ']
+#
 
-def place_of_articulation(word):
-	labiodental = [u'\u092A', u'\u092C', u'\u092B', u'\u092D', u'\u092E',u'\u0935',]
-	dental = [u'\u091F', u'\u0920', u'\u0928', u'\u0921', u'\u0922', 
-			u'\u0938', u'\u095B', u'\u0932', u'\u0931', u'\u0930']
-	glottal = u'\u0939'
+def get_type(text):
+    numerals = ['۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹', '۰']
+    vowel_modifier = ['ـں','ه']
+    vowels = ['اَ','آ','اِ','اِی','اُ','اُو', 'پر','بے','بَے','و','اَو','ـں','ه','ع','ا']
 
-	is_labiodental = any((char in labiodental) for char in word)
-	is_dental = any((char in dental) for char in word)
-	is_glottal = any((char in glottal) for char in word)
+    cnt_vowels =  0
+    cnt_vm = 0
+    cnt_num = 0
 
-	return is_labiodental, is_dental, is_glottal
+    for i in list(text):
+        if i in numerals:
+            cnt_num += 1
+        elif i in vowel_modifier:
+            cnt_vm += 1
+        elif i in vowels:
+            cnt_vowels += 1
 
-def get_svar_features(word):
+    cnt_consonants = len(text) - (cnt_vowels + cnt_vm + cnt_num)
+    return  cnt_vowels, cnt_vm, cnt_num, cnt_consonants
 
-	samvrit = [u'\u0907', u'\u0908', u'\u0909', u'\u090A', u'\u093F', 
-		u'\u0940', u'\u0941', u'\u0942']
-	ardh_samvrit = [u'\u0947', u'\u0946', u'\u094A', u'\u094B', 
-		u'\u090E', u'\u090F', u'\u0913', u'\u0912']
-	ardh_vivrit = [u'\u0955', u'\u0948', u'\u094C', u'\u0949', 
-		u'\u0905', u'\u0910', u'\u090D', u'\u0911', u'\u0914']
-	vivrit = [u'\u0906', u'\u093E']
-	# lower is same as vivrit
-	lower_middle = [u'\u0945', u'\u0949', u'\u0905', u'\u090D', u'\u0911'] 
-	upper_middle = [u'\u0910', u'\u0913', u'\u0912', u'\u090E', 
-		u'\u0946', u'\u0947', u'\u094A', u'\u094B']
-	lower_high = [u'\u0907', u'\u0909', u'\u093F', u'\u0941']
-	high = [u'\u0908', u'\u090A', u'\u0940', u'\u0942']
+def get_svar(text):
+    low = ['آ']
+    low_mid = ['اَ']
+    upper_mid = ['بے']
+    g = ['اُ','اِ']
+    h = ['اِی','اُو']
 
-	total_features = [samvrit, ardh_samvrit, ardh_vivrit, vivrit, 
-		lower_middle, upper_middle, lower_high, high]
+    # svar2
+    s = ['اِ','اِی','اُ','اُو']
+    m = ['بے','او']
+    i = ['اَو','بَے']
+    v = ['آ']
 
-	is_samvrit, is_ardhsam, is_ardhviv, is_vivrit, is_lowmid, is_upmid, is_lowhigh, is_high = \
-		[any((char in item) for char in word) for item in total_features]
+def sthaan (text):
+    d = ['ت، ط', 'تھ', 'د', 'دھ']
+    v = ['ن', 'ر', 'ل', 'ص','ث،', 'س']
+    t = ['ی','ش','س', 'چ', 'چھ', 'ج', 'جھ', 'ن']
+    m = ['ٹ', 'ٹھ', 'ڈ', 'ڈھ', 'ن']
+    k = ['ک', 'کھ', 'گ', 'گھ', 'ن']
+    y = ['پ', 'پھ', 'ب', 'بھ', 'م', 'و']
 
-	return is_samvrit, is_ardhsam, is_ardhviv, is_vivrit, is_lowmid, is_upmid, is_lowhigh, is_high 
+def prayatna(text):
+    s = ['ک','کھ', 'گ', 'گھ', 'چ', 'چھ', 'ج', 'جھ', 'ٹ', 'ٹھ', 'ڈ', 'ڈھ', 'ت، ط', 'تھ'\
+         'د', 'دھ', 'پ', 'پھ', 'ب', 'بھ']
+    n = ['ن', 'م']
+    p = ['ل']
+    r = ['ر']
+    g = ['ش', 'س', 'ص', 'ث', 'س']
+    v = ['ی','و']
 
-def get_sthaan(word):
-	y = [u'\u092A', u'\u092B', u'\u092C', u'\u092D', u'\u092E', u'\u0935']
-	d = [u'\u0924', u'\u0925', u'\u0926', u'\u0927']
-	v = [u'\u0928', u'\u0929', u'\u0930', u'\u0931', u'\u0933', u'\u0934', u'\u0932', u'\u0938']
-	t = [u'\u091A', u'\u091B', u'\u091C', u'\u091D', u'\u091E', u'\u095F', u'\u0936', u'\u0937', u'\u092F']
-	m = [u'\u091F', u'\u0920', u'\u0921', u'\u0922', u'\u0923']
-	k = [u'\u0915', u'\u0916', u'\u0917', u'\u0918', u'\u0919']
-	
-	total_features = [y, d, v, t, m, k]
-	is_dvayostha, is_dantya, is_varstya, is_talavya, is_murdhanya, is_komaltalavya = \
-		[any((char in item) for char in word) for item in total_features]
+    all_features = [s,n,p,r,g,v]
 
-	return is_dvayostha, is_dantya, is_varstya, is_talavya, is_murdhanya, is_komaltalavya
+    return [any((char in item) for char in text) for item in all_features]
 
-def get_prayatna(word):
-	nasikya = [u'\u0901', u'\u0902', u'\u0903', u'\u0919', u'\u091E', u'\u0923', u'\u0928', u'\u0929', u'\u092E']
-	sparsha = [u'\u0915', u'\u0916', u'\u0917', u'\u0918', u'\u091A', u'\u091B', u'\u091C', u'\u091D', u'\u091F',\
-		u'\u0920', u'\u0921', u'\u0922', u'\u0924', u'\u0925', u'\u0926', u'\u0927', u'\u092A', u'\u092B', u'\u092C',
-		u'\u092D']
-	parshvika = [u'\u0932', u'\u0933', u'\u0934']
-	prakampi = [u'\u0930', u'\u0931']
-	sangharshi = [u'\u0936',u'\u0937',u'\u0938']
-	ardh_svar = [u'\u095F', u'\u092F', u'\u0935']
+def modifier_type(text):
+    n = ['ـں','۱','۲','۳','۴','۵','۶','۷','۸','۹','۰']
+    v = ['اَ','آ','اِ','اِی','اُ','اُو', 'پر','بے','بَے','و','اَو','ـں','ع','ا''ه']
 
-	total_features = [nasikya, sparsha, parshvika, prakampi, sangharshi, ardh_svar]
-	is_nasikya, is_sparsha, is_parshvika, is_prakampi, is_sangarshi, is_ardhsvar = \
-		[any((char in item) for char in word) for item in total_features]	
+def diphthong(text):
+    diph = ['بَے','اَو']
+    dravidian = ['پر','او']
+    un_voiced = ['ک','کھ','ن','چ','چھ','ٹ','ٹھ','ت، ط','تھ','پ','پھ','۱','۲','۳','۴','۵','۶','۷','۸','۹','۰'] # these aren't voiced ones
+    hard = ['س']
 
-	return is_nasikya, is_sparsha, is_parshvika, is_prakampi, is_sangarshi, is_ardhsvar
+def length(text):
+    long = ['آ','آ','اُو','بَے','اَو']
+    short = ['اَ','اِ','اُ','پر','بے','او']
 
-def vowel_types(word):
-	front_vowels = [u'\u0907', u'\u0908', u'\u090F', u'\u0910']
-	mid_vowels = [u'\u0905', u'\u0906']
-	back_vowels = [u'\u0909', u'\u090A',u'\u0913', u'\u0914']
-	long_length = [u'\u0906', u'\u0908', u'\u090A', u'\u0910', u'\u0914', u'\u093E', u'\u0940', 
-		u'\u0942', u'\u0948', u'\u094C']
-	short_length = [u'\u0905', u'\u0907', u'\u0909', u'\u090B', u'\u090F', u'\u093F', u'\u0941', 
-		u'\u0913', u'\u094B', u'\u0947', u'\u0943']
-	medium_length = [u'\u090E', u'\u090D', u'\u0912', u'\u0911', u'\u0946', u'\u0945', u'\u094A', u'\u0949']
+def height(text):
+    front = ['اِ','اِی','بے','بَے']
+    mid = ['اَ']
+    back = ['آ','اُ','اُو','او','اَو']
 
-	total_features = [front_vowels, mid_vowels, back_vowels, long_length, short_length, medium_length]
-
-	is_front, is_mid, is_back, is_long, is_short, is_medium = \
-		[any((char in item) for char in word) for item in total_features]
-
-	return is_front, is_mid, is_back, is_long, is_short, is_medium
-
-def misc_features(word):
-	dravidian = [u'\u090B', u'\u0912', u'\u0931', u'\u0934', u'\u0946', u'\u094A']
-	bangla = [u'\u095F']
-	hard = [u'\u0937',u'\u0933',u'\u0931']
-
-	total_features = [dravidian, bangla, hard]
-
-	is_dravidian, is_bangla, is_hard = [any((char in item) for char in word) for item in total_features]
-
-	return is_dravidian, is_bangla, is_hard
+aspirated = ["کھ",'گھ','چھ','جھ','ٹھ','ڈھ','تھ','دھ','پھ','بھ','ش','س','ح']
 
 def phonetic_features(word):
 	vowels = [u'\u0905', u'\u0906', u'\u0907', u'\u0908', u'\u0909', 
