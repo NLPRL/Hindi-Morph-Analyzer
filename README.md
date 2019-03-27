@@ -1,4 +1,4 @@
-# Hindi-morph-analyzer
+# Hindi-morph-analyzer [![made-with-python](https://img.shields.io/badge/Made%20with-Python-1f425f.svg)](https://www.python.org/)
 
 This repository hosts the codes necessary to reproduce the results of our approach towards Morphological analysis of Hindi words.
 
